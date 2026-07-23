@@ -1,7 +1,7 @@
 
 const STORAGE_KEY = "ntfl-site-draft";
 const AUTH_KEY = "ntfl-admin-auth";
-const DATA_URL = "data/site-data.json";
+const DATA_URL = "data/site-data.json?v=" + Date.now();
 const DEMO_USER = "demo";
 const DEMO_PASS = "demo123";
 
@@ -53,7 +53,7 @@ function clearDraft() {
   localStorage.removeItem(STORAGE_KEY);
 }
 function loadLogoSrc() {
-  return "assets/IMG_5900.png";
+  return "assets/league-logo.jpeg";
 }
 function teamLookup(data = state.data) {
   return data?.teams || {};
@@ -284,7 +284,7 @@ function normalizeData(input) {
     season: "Season 3",
     currentWeek: 1,
     subtitle: "Modern editable league hub",
-    version: "modern-fix-3",
+    version: "modern-static-2026-07-23",
     lastUpdated: new Date().toISOString().slice(0, 10)
   }, data.site || {});
   data.divisions = Array.isArray(data.divisions) ? data.divisions : [];
@@ -310,113 +310,23 @@ function normalizeData(input) {
 }
 
 async function loadData() {
-  const draft = loadDraft();
-  if (draft) {
-    try { return normalizeData(draft); } catch {}
-  }
   const res = await fetch(DATA_URL, { cache: "no-store" });
   if (!res.ok) throw new Error("Could not load data");
-  return normalizeData(await res.json());
+  const base = normalizeData(await res.json());
+  if (isAuthed()) {
+    const draft = loadDraft();
+    if (draft) {
+      try { return normalizeData(draft); } catch {}
+    }
+  }
+  return base;
 }
 
 function saveToBrowser() {
-  syncAdminDraft();
-}
-
-function readSiteEditor() {
-  const card = document.getElementById("site-editor");
-  if (!card) return;
-  const inputs = card.querySelectorAll("input");
-  const map = Object.fromEntries([...inputs].map(i => [i.name, i.value]));
-  state.data.site.name = map.siteName || state.data.site.name;
-  state.data.site.season = map.siteSeason || state.data.site.season;
-  state.data.site.currentWeek = Number(map.siteWeek || state.data.site.currentWeek || 1);
-  state.data.site.subtitle = map.siteSubtitle || state.data.site.subtitle;
-}
-
-function readGamesEditor() {
-  const card = document.getElementById("games-editor");
-  if (!card) return;
-  const rows = card.querySelectorAll(".game-edit");
-  rows.forEach(row => {
-    const id = row.dataset.gameId;
-    const game = state.data.games.find(g => g.id === id);
-    if (!game) return;
-    const get = field => row.querySelector(`[data-field="${field}"]`)?.value ?? "";
-    const hs = get("homeScore");
-    const as = get("awayScore");
-    game.homeScore = hs === "" ? null : Number(hs);
-    game.awayScore = as === "" ? null : Number(as);
-    game.status = get("status") || "upcoming";
-    game.time = get("time");
-    game.played = game.status === "final";
-  });
-}
-
-function readTeamEditor() {
-  const card = document.getElementById("team-editor");
-  if (!card) return;
-  const slug = state.ui.adminTeam;
-  const team = teamBySlug(slug);
-  if (!team) return;
-  team.headCoach = card.querySelector('[name="headCoach"]')?.value || "TBD";
-  team.assistantCoach = card.querySelector('[name="assistantCoach"]')?.value || "TBD";
-  team.notes = card.querySelector('[name="notes"]')?.value || "";
-}
-
-function readAwardsEditor() {
-  const rows = document.querySelectorAll("#awards-editor [data-award-row]");
-  state.data.awards = [...rows].map(row => ({
-    category: row.querySelector('[data-field="category"]')?.value || "",
-    winner: row.querySelector('[data-field="winner"]')?.value || "",
-    team: row.querySelector('[data-field="team"]')?.value || ""
-  }));
-}
-
-function readHistoryEditor() {
-  const rows = document.querySelectorAll("#history-editor [data-history-row]");
-  state.data.history = [...rows].map(row => ({
-    season: row.querySelector('[data-field="season"]')?.value || "",
-    champion: row.querySelector('[data-field="champion"]')?.value || "",
-    record: row.querySelector('[data-field="record"]')?.value || "",
-    notes: row.querySelector('[data-field="notes"]')?.value || ""
-  }));
-}
-
-function readHOFEditor() {
-  const rows = document.querySelectorAll("#hof-editor [data-hof-row]");
-  state.data.hallOfFame = [...rows].map(row => ({
-    name: row.querySelector('[data-field="name"]')?.value || "",
-    team: row.querySelector('[data-field="team"]')?.value || "",
-    honor: row.querySelector('[data-field="honor"]')?.value || "",
-    notes: row.querySelector('[data-field="notes"]')?.value || ""
-  }));
-}
-
-function syncAdminDraft() {
-  readSiteEditor();
-  readGamesEditor();
-  readTeamEditor();
-  readAwardsEditor();
-  readHistoryEditor();
-  readHOFEditor();
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  rebuildDerived(state.data);
   saveDraft(state.data);
 }
 
-function bindAdminAutosave() {
-  if (!isAuthed() || state.route.page !== "admin") return;
-  const root = document.querySelector(".admin-grid");
-  if (!root || root.dataset.autosyncBound === "1") return;
-  root.dataset.autosyncBound = "1";
-  const handler = () => syncAdminDraft();
-  root.addEventListener("input", handler);
-  root.addEventListener("change", handler);
-}
-
 function downloadJSON() {
-  syncAdminDraft();
   const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -957,10 +867,10 @@ function adminPage() {
         <div class="card" id="site-editor">
           ${adminSectionTitle("Site settings", "League name, season, current week, and subtitle.")}
           <div class="form-grid">
-            <label>League Name<input class="input" name="siteName" value="${esc(state.data.site.name || "")}"></label>
-            <label>Season<input class="input" name="siteSeason" value="${esc(state.data.site.season || "")}"></label>
-            <label>Current Week<input class="input" type="number" min="1" name="siteWeek" value="${esc(state.data.site.currentWeek || 1)}"></label>
-            <label>Subtitle<input class="input" name="siteSubtitle" value="${esc(state.data.site.subtitle || "")}"></label>
+            <label>League Name<input class="input" name="siteName" value="${esc(state.data.site.name || "")}" oninput="NTFL.siteField('name', this.value)"></label>
+            <label>Season<input class="input" name="siteSeason" value="${esc(state.data.site.season || "")}" oninput="NTFL.siteField('season', this.value)"></label>
+            <label>Current Week<input class="input" type="number" min="1" name="siteWeek" value="${esc(state.data.site.currentWeek || 1)}" oninput="NTFL.siteField('currentWeek', this.value)"></label>
+            <label>Subtitle<input class="input" name="siteSubtitle" value="${esc(state.data.site.subtitle || "")}" oninput="NTFL.siteField('subtitle', this.value)"></label>
           </div>
           <div class="row right">
             <button class="btn primary" onclick="NTFL.saveSite()">Save Site Settings</button>
@@ -992,16 +902,16 @@ function adminPage() {
                   <span class="pill">${esc(game.id)}</span>
                 </div>
                 <div class="form-grid compact">
-                  <label>Home Score<input class="input" type="number" data-field="homeScore" value="${game.homeScore ?? ""}"></label>
-                  <label>Away Score<input class="input" type="number" data-field="awayScore" value="${game.awayScore ?? ""}"></label>
+                  <label>Home Score<input class="input" type="number" data-field="homeScore" value="${game.homeScore ?? ""}" onchange="NTFL.gameField('${esc(game.id)}', 'homeScore', this.value)"></label>
+                  <label>Away Score<input class="input" type="number" data-field="awayScore" value="${game.awayScore ?? ""}" onchange="NTFL.gameField('${esc(game.id)}', 'awayScore', this.value)"></label>
                   <label>Status
-                    <select class="select" data-field="status">
+                    <select class="select" data-field="status" onchange="NTFL.gameField('${esc(game.id)}', 'status', this.value)">
                       <option value="upcoming" ${parseGameStatus(game)==="upcoming" ? "selected" : ""}>Upcoming</option>
                       <option value="live" ${parseGameStatus(game)==="live" ? "selected" : ""}>Live</option>
                       <option value="final" ${parseGameStatus(game)==="final" ? "selected" : ""}>Final</option>
                     </select>
                   </label>
-                  <label>Time / Note<input class="input" data-field="time" value="${esc(game.time || "")}"></label>
+                  <label>Time / Note<input class="input" data-field="time" value="${esc(game.time || "")}" oninput="NTFL.gameField('${esc(game.id)}', 'time', this.value)"></label>
                 </div>
               </div>
             `).join("") : `<div class="empty card">No games for this division/week.</div>`}
@@ -1019,10 +929,10 @@ function adminPage() {
             </select>
           </label>
           <div class="form-grid">
-            <label>Head Coach<input class="input" name="headCoach" value="${esc(selectedTeam?.headCoach || "")}"></label>
-            <label>Assistant Coach<input class="input" name="assistantCoach" value="${esc(selectedTeam?.assistantCoach || "")}"></label>
+            <label>Head Coach<input class="input" name="headCoach" value="${esc(selectedTeam?.headCoach || "")}" oninput="NTFL.teamField('${selectedTeam?.slug}', 'headCoach', this.value)"></label>
+            <label>Assistant Coach<input class="input" name="assistantCoach" value="${esc(selectedTeam?.assistantCoach || "")}" oninput="NTFL.teamField('${selectedTeam?.slug}', 'assistantCoach', this.value)"></label>
           </div>
-          <label>Notes<textarea class="textarea" name="notes" rows="5">${esc(selectedTeam?.notes || "")}</textarea></label>
+          <label>Notes<textarea class="textarea" name="notes" rows="5" oninput="NTFL.teamField('${selectedTeam?.slug}', 'notes', this.value)">${esc(selectedTeam?.notes || "")}</textarea></label>
           <div class="row right">
             <button class="btn primary" onclick="NTFL.saveTeam()">Save Team</button>
           </div>
@@ -1056,9 +966,9 @@ function adminPage() {
             ${(state.data.awards || []).map((a, idx) => `
               <div class="card nested" data-award-row="${idx}">
                 <div class="form-grid compact">
-                  <label>Category<input class="input" data-field="category" value="${esc(a.category || a.name || "")}"></label>
-                  <label>Winner<input class="input" data-field="winner" value="${esc(a.winner || "")}"></label>
-                  <label>Team<input class="input" data-field="team" value="${esc(a.team || "")}"></label>
+                  <label>Category<input class="input" data-field="category" value="${esc(a.category || a.name || "")}" oninput="NTFL.awardField(${idx}, 'category', this.value)"></label>
+                  <label>Winner<input class="input" data-field="winner" value="${esc(a.winner || "")}" oninput="NTFL.awardField(${idx}, 'winner', this.value)"></label>
+                  <label>Team<input class="input" data-field="team" value="${esc(a.team || "")}" oninput="NTFL.awardField(${idx}, 'team', this.value)"></label>
                 </div>
               </div>
             `).join("")}
@@ -1075,10 +985,10 @@ function adminPage() {
             ${(state.data.history || []).map((h, idx) => `
               <div class="card nested" data-history-row="${idx}">
                 <div class="form-grid compact">
-                  <label>Season<input class="input" data-field="season" value="${esc(h.season || "")}"></label>
-                  <label>Champion<input class="input" data-field="champion" value="${esc(h.champion || "")}"></label>
-                  <label>Record<input class="input" data-field="record" value="${esc(h.record || "")}"></label>
-                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}"></label>
+                  <label>Season<input class="input" data-field="season" value="${esc(h.season || "")}" oninput="NTFL.historyField(${idx}, 'season', this.value)"></label>
+                  <label>Champion<input class="input" data-field="champion" value="${esc(h.champion || "")}" oninput="NTFL.historyField(${idx}, 'champion', this.value)"></label>
+                  <label>Record<input class="input" data-field="record" value="${esc(h.record || "")}" oninput="NTFL.historyField(${idx}, 'record', this.value)"></label>
+                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}" oninput="NTFL.historyField(${idx}, 'notes', this.value)"></label>
                 </div>
               </div>
             `).join("")}
@@ -1095,10 +1005,10 @@ function adminPage() {
             ${(state.data.hallOfFame || []).map((h, idx) => `
               <div class="card nested" data-hof-row="${idx}">
                 <div class="form-grid compact">
-                  <label>Name<input class="input" data-field="name" value="${esc(h.name || "")}"></label>
-                  <label>Team<input class="input" data-field="team" value="${esc(h.team || "")}"></label>
-                  <label>Honor<input class="input" data-field="honor" value="${esc(h.honor || "")}"></label>
-                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}"></label>
+                  <label>Name<input class="input" data-field="name" value="${esc(h.name || "")}" oninput="NTFL.hofField(${idx}, 'name', this.value)"></label>
+                  <label>Team<input class="input" data-field="team" value="${esc(h.team || "")}" oninput="NTFL.hofField(${idx}, 'team', this.value)"></label>
+                  <label>Honor<input class="input" data-field="honor" value="${esc(h.honor || "")}" oninput="NTFL.hofField(${idx}, 'honor', this.value)"></label>
+                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}" oninput="NTFL.hofField(${idx}, 'notes', this.value)"></label>
                 </div>
               </div>
             `).join("") || `<div class="empty card">No Hall of Fame entries yet.</div>`}
@@ -1198,7 +1108,6 @@ function render() {
       ${footerHTML()}
     </div>
   `;
-  bindAdminAutosave();
 }
 
 function persistAndRender() {
@@ -1335,11 +1244,10 @@ function logout() {
   render();
 }
 function saveBrowser() {
-  syncAdminDraft();
+  saveDraft(state.data);
   alert("Draft saved in this browser.");
 }
 function download() {
-  syncAdminDraft();
   const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
@@ -1379,6 +1287,70 @@ function moveRankInternal(from, to) {
   render();
 }
 
+
+function siteField(field, value) {
+  if (!state.data?.site) return;
+  state.data.site[field] = field === "currentWeek" ? Number(value || 1) : value;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  saveDraft(state.data);
+}
+
+function gameField(gameId, field, value) {
+  const game = state.data?.games?.find(g => g.id === gameId);
+  if (!game) return;
+  if (field === "homeScore" || field === "awayScore") {
+    game[field] = value === "" ? null : Number(value);
+  } else {
+    game[field] = value;
+  }
+  if (field === "status" && value !== "final") {
+    game.played = false;
+  } else if (field === "status" && value === "final") {
+    game.played = true;
+  }
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  rebuildDerived(state.data);
+  saveDraft(state.data);
+}
+
+function teamField(slug, field, value) {
+  const team = teamBySlug(slug);
+  if (!team) return;
+  team[field] = value;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  saveDraft(state.data);
+}
+
+function awardField(index, field, value) {
+  const item = state.data?.awards?.[index];
+  if (!item) return;
+  item[field] = value;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  saveDraft(state.data);
+}
+
+function historyField(index, field, value) {
+  const item = state.data?.history?.[index];
+  if (!item) return;
+  item[field] = value;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  saveDraft(state.data);
+}
+
+function hofField(index, field, value) {
+  const item = state.data?.hallOfFame?.[index];
+  if (!item) return;
+  item[field] = value;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  saveDraft(state.data);
+}
+
+function syncDraftAndRender() {
+  rebuildDerived(state.data);
+  saveDraft(state.data);
+  render();
+}
+
 window.NTFL = {
   searchTeams,
   setTeamTab,
@@ -1401,7 +1373,13 @@ window.NTFL = {
   dragRankStart,
   dragRankOver,
   dropRank,
-  moveRank
+  moveRank,
+  siteField,
+  gameField,
+  teamField,
+  awardField,
+  historyField,
+  hofField
 };
 
 (async function init() {
