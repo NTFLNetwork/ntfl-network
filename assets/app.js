@@ -256,18 +256,29 @@ function navHtml() {
     <div class="dropdown" id="menuDropdown">
       <button type="button" id="menuButton">Menu ▾</button>
       <div class="dropdown-panel">
-        <a href="#/">Home</a>
-        <a href="#/teams">Teams</a>
-        <a href="#/schedule">Schedule</a>
-        <a href="#/standings">Standings</a>
-        <a href="#/rankings">Rankings</a>
-        <a href="#/awards">Awards</a>
-        <a href="#/history">History</a>
-        <a href="#/hof">Hall of Fame</a>
-        <a href="#/admin">Admin</a>
+        <div class="menu-section">
+          <div class="menu-heading">League</div>
+          <div class="menu-subtitle">Main pages and live league pages.</div>
+          <a class="menu-link" href="#/"><strong>Home</strong><small>Latest updates and featured games</small></a>
+          <a class="menu-link" href="#/teams"><strong>Teams</strong><small>Click any team for a rundown</small></a>
+          <a class="menu-link" href="#/schedule"><strong>Schedule</strong><small>All weeks and results</small></a>
+          <a class="menu-link" href="#/standings"><strong>Standings</strong><small>Records and point differential</small></a>
+        </div>
+        <div class="menu-section">
+          <div class="menu-heading">Extras</div>
+          <div class="menu-subtitle">Season pages and league history.</div>
+          <a class="menu-link" href="#/rankings"><strong>Rankings</strong><small>Drag-reorder power rankings</small></a>
+          <a class="menu-link" href="#/awards"><strong>Awards</strong><small>MVP, coach, and more</small></a>
+          <a class="menu-link" href="#/history"><strong>History</strong><small>Past seasons and champions</small></a>
+          <a class="menu-link" href="#/hof"><strong>Hall of Fame</strong><small>Legends and memories</small></a>
+        </div>
+        <div class="menu-section">
+          <div class="menu-heading">Admin</div>
+          <a class="menu-link" href="#/admin"><strong>Admin</strong><small>Edit teams, scores, rankings, and pages</small></a>
+        </div>
       </div>
     </div>
-    <button type="button" id="authBtn">${isAuthed() ? "Logout" : "Demo Login"}</button>
+    <button type="button" id="authBtn">${isAuthed() ? "Logout" : "Admin Login"}</button>
   `;
 }
 
@@ -521,19 +532,143 @@ function teamView(slug) {
   `;
 }
 
+function rankingMetaForSlug(slug) {
+  const team = state.data.teams?.[slug];
+  if (!team) return null;
+  return {
+    slug,
+    team: team.name,
+    record: `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ""}`,
+    pointsFor: team.pointsFor,
+    pointsAgainst: team.pointsAgainst,
+    pointDiff: team.pointDiff,
+  };
+}
+
+function rankingRowsFromState() {
+  const source = Array.isArray(state.data.rankings) && state.data.rankings.length
+    ? state.data.rankings
+    : standingsDataFromTeams().slice(0, Math.max(8, Object.keys(state.data.teams || {}).length));
+  return source.map((row, idx) => {
+    const slug = row.slug || slugify(row.team);
+    const meta = rankingMetaForSlug(slug) || null;
+    return {
+      rank: idx + 1,
+      slug,
+      team: meta?.team || row.team || "",
+      note: row.note || row.blurb || "",
+      record: meta?.record || row.record || "",
+      pointsFor: meta?.pointsFor ?? row.pointsFor ?? "",
+      pointsAgainst: meta?.pointsAgainst ?? row.pointsAgainst ?? "",
+      pointDiff: meta?.pointDiff ?? row.pointDiff ?? "",
+    };
+  });
+}
+
+function rankingEditorRowHtml(row, idx) {
+  const teams = Object.values(state.data.teams || {});
+  return `
+    <div class="ranking-item" draggable="true" data-ranking-row data-index="${idx}">
+      <div class="rank-handle" title="Drag to reorder">☰</div>
+      <div class="rank-number">${idx + 1}</div>
+      <div class="rank-fields">
+        <div>
+          <label class="small muted">Team</label>
+          <select class="rankingTeamInput">
+            ${teams.map(t => `<option value="${esc(t.slug)}" ${t.slug === row.slug ? 'selected' : ''}>${esc(t.name)}</option>`).join('')}
+          </select>
+        </div>
+        <div>
+          <label class="small muted">Note</label>
+          <input class="rankingNoteInput" value="${esc(row.note || '')}" placeholder="Optional note">
+        </div>
+      </div>
+      <div class="rank-actions">
+        <button type="button" class="chip-btn secondary rank-up">Up</button>
+        <button type="button" class="chip-btn secondary rank-down">Down</button>
+        <button type="button" class="chip-btn secondary rank-remove">Remove</button>
+      </div>
+    </div>
+  `;
+}
+
+function rankingsEditorHtml() {
+  const rows = rankingRowsFromState();
+  return `
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div>
+          <h3>Rankings</h3>
+          <div class="muted small">Drag to reorder, then save. Rankings are automatically renumbered.</div>
+        </div>
+        <div class="actions">
+          <button type="button" class="chip-btn secondary" id="addRankingBtn">Add row</button>
+          <button type="button" class="chip-btn secondary" id="resetRankingsBtn">Reset from standings</button>
+        </div>
+      </div>
+      <div style="height:12px"></div>
+      <div id="rankingsEditor" class="rankings-editor">
+        ${rows.map((row, idx) => rankingEditorRowHtml(row, idx)).join('')}
+      </div>
+    </div>
+  `;
+}
+
+function collectRankingsFromEditor() {
+  const rows = Array.from(document.querySelectorAll('#rankingsEditor [data-ranking-row]'));
+  return rows.map((row, idx) => {
+    const slug = row.querySelector('.rankingTeamInput')?.value || '';
+    const note = row.querySelector('.rankingNoteInput')?.value || '';
+    const team = state.data.teams?.[slug];
+    if (!team) return null;
+    return {
+      rank: idx + 1,
+      slug,
+      team: team.name,
+      note,
+      record: `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ''}`,
+      pointsFor: team.pointsFor,
+      pointsAgainst: team.pointsAgainst,
+      pointDiff: team.pointDiff,
+    };
+  }).filter(Boolean);
+}
+
+function renumberRankingEditor() {
+  document.querySelectorAll('#rankingsEditor [data-ranking-row]').forEach((row, idx) => {
+    const num = row.querySelector('.rank-number');
+    if (num) num.textContent = idx + 1;
+    row.dataset.index = idx;
+  });
+}
+
+function moveRankingRow(row, direction) {
+  const editor = $('rankingsEditor');
+  if (!editor || !row) return;
+  const rows = Array.from(editor.querySelectorAll('[data-ranking-row]'));
+  const idx = rows.indexOf(row);
+  const nextIdx = idx + direction;
+  if (idx < 0 || nextIdx < 0 || nextIdx >= rows.length) return;
+  if (direction < 0) {
+    editor.insertBefore(row, rows[nextIdx]);
+  } else {
+    editor.insertBefore(rows[nextIdx], row);
+  }
+  renumberRankingEditor();
+}
+
 function adminLoginView() {
   return `
     ${hero("Admin", "Demo login", "Use the demo login to open the dashboard and edit the league data.")}
     <section class="section">
       <div class="card" style="max-width:520px;margin:0 auto">
         <div class="grid cols-2">
-          <div><label class="small muted">Username</label><input id="loginUser" placeholder="demo"></div>
-          <div><label class="small muted">Password</label><input id="loginPass" type="password" placeholder="demo123"></div>
+          <div><label class="small muted">Username</label><input id="loginUser" placeholder="Username"></div>
+          <div><label class="small muted">Password</label><input id="loginPass" type="password" placeholder="Password"></div>
         </div>
         <div style="height:12px"></div>
         <div class="actions"><button class="chip-btn primary" id="loginBtn">Log in</button></div>
-        <div class="notice" style="margin-top:12px">Demo credentials: <strong>demo / demo123</strong></div>
-        <div class="muted small" id="adminStatus" style="margin-top:10px"></div>
+        <div class="muted small" id="adminStatus" style="margin-top:10px">Enter your admin credentials to access the dashboard.</div>
       </div>
     </section>
   `;
@@ -548,7 +683,7 @@ function adminFormView() {
   const weekIdx = Math.max(0, (Number(state.adminWeek) || 1) - 1);
   const week = div?.weeks?.[weekIdx] || div?.weeks?.[0];
   return `
-    ${hero("Admin", "Editable dashboard", "Change site info, game scores, live/final status, team notes, awards, history, and the raw JSON from one place.")}
+    ${hero("Admin", "Editable dashboard", "Change site info, game scores, live/final status, team notes, awards, history, and rankings from one place.")}
     <section class="section">
       <div class="grid cols-2">
         <div class="card">
@@ -612,7 +747,6 @@ function adminFormView() {
         <div class="card">
           <h3>Rankings / Awards / History / HOF JSON</h3>
           <div class="grid cols-2">
-            <div><label class="small muted">Rankings</label><textarea id="rankingsInput" style="min-height:110px">${esc(JSON.stringify(state.data.rankings, null, 2))}</textarea></div>
             <div><label class="small muted">Awards</label><textarea id="awardsInput" style="min-height:110px">${esc(JSON.stringify(state.data.awards, null, 2))}</textarea></div>
             <div><label class="small muted">History</label><textarea id="historyInput" style="min-height:110px">${esc(JSON.stringify(state.data.history, null, 2))}</textarea></div>
             <div><label class="small muted">Hall of Fame</label><textarea id="hofInput" style="min-height:110px">${esc(JSON.stringify(state.data.hallOfFame, null, 2))}</textarea></div>
@@ -621,10 +755,13 @@ function adminFormView() {
       </div>
     </section>
     <section class="section">
+      ${rankingsEditorHtml()}
+    </section>
+    <section class="section">
       <div class="card">
         <h3>Raw JSON editor</h3>
         <textarea id="jsonEditor" style="min-height:360px">${esc(JSON.stringify(state.data, null, 2))}</textarea>
-        <div class="muted small" id="adminStatus" style="margin-top:10px"></div>
+        <div class="muted small" id="adminStatus" style="margin-top:10px">Enter your admin credentials to access the dashboard.</div>
       </div>
     </section>
   `;
@@ -745,7 +882,7 @@ function bindAdminEvents() {
   const loginPass = $("loginPass");
   if (loginBtn) {
     loginBtn.onclick = () => {
-      if ((loginUser?.value || "").trim() === DEMO_USER && (loginPass?.value || "") === DEMO_PASS) {
+      if ((loginUser?.value || "").trim() === DEMO_USER && (loginPass?.value || "").trim() === DEMO_PASS) {
         setAuthed(true);
         renderView();
       } else if (status) {
@@ -763,6 +900,57 @@ function bindAdminEvents() {
   if (teamSelect) teamSelect.onchange = () => { state.adminTeam = teamSelect.value; renderView(); };
 
   $("logoutBtn")?.addEventListener("click", () => { setAuthed(false); renderView(); });
+
+  const rankingEditor = $("rankingsEditor");
+  let draggingRow = null;
+  if (rankingEditor) {
+    rankingEditor.addEventListener("dragstart", (e) => {
+      const row = e.target.closest("[data-ranking-row]");
+      if (!row) return;
+      draggingRow = row;
+      row.classList.add("dragging");
+      e.dataTransfer.effectAllowed = "move";
+    });
+    rankingEditor.addEventListener("dragend", () => {
+      draggingRow?.classList.remove("dragging");
+      draggingRow = null;
+      renumberRankingEditor();
+    });
+    rankingEditor.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      const row = e.target.closest("[data-ranking-row]");
+      if (!row || !draggingRow || row === draggingRow) return;
+      const rect = row.getBoundingClientRect();
+      const before = e.clientY < rect.top + rect.height / 2;
+      if (before) row.parentNode.insertBefore(draggingRow, row);
+      else row.parentNode.insertBefore(draggingRow, row.nextSibling);
+      renumberRankingEditor();
+    });
+    rankingEditor.addEventListener("click", (e) => {
+      const row = e.target.closest("[data-ranking-row]");
+      if (!row) return;
+      if (e.target.closest('.rank-up')) moveRankingRow(row, -1);
+      if (e.target.closest('.rank-down')) moveRankingRow(row, 1);
+      if (e.target.closest('.rank-remove')) { row.remove(); renumberRankingEditor(); }
+    });
+  }
+
+  $("addRankingBtn")?.addEventListener("click", () => {
+    const editor = $("rankingsEditor");
+    if (!editor) return;
+    const firstTeam = Object.keys(state.data.teams || {})[0] || "";
+    const newRowWrap = document.createElement('div');
+    newRowWrap.innerHTML = rankingEditorRowHtml({ slug: firstTeam, note: "" }, editor.querySelectorAll('[data-ranking-row]').length);
+    editor.appendChild(newRowWrap.firstElementChild);
+    renumberRankingEditor();
+  });
+
+  $("resetRankingsBtn")?.addEventListener("click", () => {
+    const editor = $("rankingsEditor");
+    if (!editor) return;
+    editor.innerHTML = rankingRowsFromState().map((row, idx) => rankingEditorRowHtml(row, idx)).join('');
+    renumberRankingEditor();
+  });
 
   $("saveAllBtn")?.addEventListener("click", () => {
     try {
@@ -796,7 +984,7 @@ function bindAdminEvents() {
         team.logo = $("teamLogoInput")?.value || team.logo || "";
       }
 
-      try { data.rankings = JSON.parse($("rankingsInput")?.value || "[]"); } catch {}
+      data.rankings = collectRankingsFromEditor();
       try { data.awards = JSON.parse($("awardsInput")?.value || "[]"); } catch {}
       try { data.history = JSON.parse($("historyInput")?.value || "[]"); } catch {}
       try { data.hallOfFame = JSON.parse($("hofInput")?.value || "[]"); } catch {}
@@ -805,7 +993,6 @@ function bindAdminEvents() {
       if (json) {
         try {
           const parsed = JSON.parse(json.value);
-          // merge the quick forms over the raw JSON so the site-controlled fields win.
           parsed.site = data.site;
           parsed.divisions = data.divisions;
           parsed.teams = data.teams;

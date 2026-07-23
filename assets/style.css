@@ -102,3 +102,136 @@ tr.current td{background:rgba(59,130,246,.11)}
 #view textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
 #view select { appearance: none; }
 #view label { display:block; margin-bottom:6px; }
+
+
+/* Mobile menu clarity */
+.dropdown > button{
+  white-space:nowrap;
+}
+.dropdown-panel{
+  width:min(320px, calc(100vw - 24px));
+  max-height:min(72vh, 640px);
+  overflow:auto;
+}
+.menu-section{
+  padding:8px 8px 2px;
+}
+.menu-heading{
+  font-size:11px;
+  letter-spacing:.12em;
+  text-transform:uppercase;
+  color:var(--muted);
+  padding:8px 12px 6px;
+}
+.menu-subtitle{
+  font-size:12px;
+  color:var(--muted);
+  padding:0 12px 8px;
+  line-height:1.35;
+}
+.menu-link{
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.menu-link small{
+  color:var(--muted);
+  font-size:11px;
+  line-height:1.25;
+}
+@media (max-width: 680px){
+  .dropdown-panel{
+    width:calc(100vw - 20px);
+    min-width:0;
+    left:0;
+    right:auto;
+  }
+  .nav{
+    width:100%;
+  }
+  .nav > .dropdown,
+  .nav > button{
+    flex:1 1 auto;
+  }
+  .nav > button,
+  .nav > .dropdown > button{
+    justify-content:center;
+    width:100%;
+  }
+}
+
+/* Drag rankings editor */
+.rankings-editor{
+  display:flex;
+  flex-direction:column;
+  gap:10px;
+}
+.ranking-item{
+  display:grid;
+  grid-template-columns: 28px 42px minmax(0,1fr) auto;
+  gap:10px;
+  align-items:start;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:18px;
+  background:rgba(255,255,255,.03);
+}
+.ranking-item.dragging{
+  opacity:.55;
+  transform:scale(.99);
+}
+.rank-handle{
+  user-select:none;
+  cursor:grab;
+  font-size:18px;
+  line-height:1;
+  color:var(--muted);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  padding-top:6px;
+}
+.rank-number{
+  font-weight:800;
+  font-size:16px;
+  color:var(--text);
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:42px;
+  border-radius:12px;
+  background:rgba(59,130,246,.14);
+  border:1px solid rgba(59,130,246,.25);
+}
+.rank-fields{
+  display:grid;
+  grid-template-columns: 1fr 1fr;
+  gap:10px;
+}
+.rank-actions{
+  display:flex;
+  flex-direction:column;
+  gap:8px;
+  align-items:stretch;
+}
+.rank-actions .chip-btn{
+  justify-content:center;
+  padding:9px 10px;
+  border-radius:12px;
+}
+@media (max-width: 680px){
+  .ranking-item{
+    grid-template-columns: 28px 42px minmax(0,1fr);
+  }
+  .rank-actions{
+    grid-column: 1 / -1;
+    flex-direction:row;
+    flex-wrap:wrap;
+  }
+  .rank-actions .chip-btn{
+    flex:1 1 0;
+  }
+  .rank-fields{
+    grid-template-columns: 1fr;
+  }
+}
