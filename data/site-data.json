@@ -3,8 +3,8 @@
     "name": "NTFL",
     "season": "Season 3",
     "currentWeek": 3,
-    "subtitle": "Editable league hub",
-    "version": "paragon-modern",
+    "subtitle": "Modern editable league hub",
+    "version": "paragon-modern-fix-2",
     "lastUpdated": "2026-07-23"
   },
   "divisions": [
