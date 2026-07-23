@@ -1,6 +1,6 @@
 
-const STORAGE_KEY = "ntfl-site-draft";
-const AUTH_KEY = "ntfl-admin-auth";
+const STORAGE_KEY = "ntfl-draft-v2";
+const AUTH_KEY = "ntfl-auth-v2";
 const DATA_URL = "data/site-data.json?v=" + Date.now();
 const DEMO_USER = "demo";
 const DEMO_PASS = "demo123";
@@ -11,10 +11,13 @@ const state = {
   ui: {
     search: "",
     teamTabs: {},
+    week: 3,
+    division: "",
+    adminWeek: 3,
     adminDivision: "",
-    adminWeek: 1,
     adminTeam: "",
     adminRankDrag: null,
+    statusFilter: "all"
   }
 };
 
@@ -26,10 +29,29 @@ function esc(v) {
   }[m]));
 }
 function slugify(v) {
-  return String(v ?? "").toLowerCase().trim().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+  return String(v ?? "")
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-+|-+$/g, "");
 }
 function clone(v) {
   return JSON.parse(JSON.stringify(v));
+}
+function teamLookup() {
+  return state.data?.teams || {};
+}
+function teamsArray() {
+  return Object.values(teamLookup());
+}
+function getTeam(slug) {
+  return state.data?.teams?.[slug];
+}
+function currentWeek() {
+  return Number(state.data?.site?.currentWeek || 1);
+}
+function teamRouteSlug(name) {
+  return slugify(name);
 }
 function isAuthed() {
   return localStorage.getItem(AUTH_KEY) === "1";
@@ -52,53 +74,69 @@ function saveDraft(data) {
 function clearDraft() {
   localStorage.removeItem(STORAGE_KEY);
 }
-function loadLogoSrc() {
+function logoSrc() {
   return "assets/league-logo.jpeg";
-}
-function teamLookup(data = state.data) {
-  return data?.teams || {};
-}
-function teamsArray(data = state.data) {
-  return Object.values(teamLookup(data));
-}
-function currentWeek() {
-  return Number(state.data?.site?.currentWeek || 1);
-}
-function currentSeason() {
-  return state.data?.site?.season || "Season";
 }
 function statusLabel(status) {
   if (status === "final") return "FINAL";
   if (status === "live") return "LIVE";
   return "UPCOMING";
 }
-function resultLabel(game) {
-  if (!Number.isFinite(game.scoreFor) || !Number.isFinite(game.scoreAgainst)) {
-    return game.status === "live" ? "LIVE" : "TBD";
-  }
-  if (game.scoreFor > game.scoreAgainst) return "W";
-  if (game.scoreFor < game.scoreAgainst) return "L";
-  return "T";
+function statusPillClass(status) {
+  if (status === "final") return "good";
+  if (status === "live") return "live";
+  return "";
 }
-function weekNum(label) {
-  const n = Number(String(label ?? "").replace(/\D+/g, ""));
-  return Number.isFinite(n) ? n : 0;
+function teamColors(team) {
+  return [
+    team?.primaryColor || "#1d4ed8",
+    team?.secondaryColor || "#ef4444"
+  ];
 }
-function hashColor(input) {
-  const s = slugify(input);
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0;
-  const hue = h % 360;
-  return `linear-gradient(135deg, hsl(${hue} 75% 56%), hsl(${(hue + 36) % 360} 62% 22%))`;
+function teamAbbr(team) {
+  return (team?.abbr || team?.name || "NTFL").toUpperCase();
+}
+function teamBadgeStyle(team) {
+  const [a, b] = teamColors(team);
+  return `background: linear-gradient(145deg, ${a}, ${b});`;
+}
+function teamBadge(team) {
+  return `<span class="team-badge" style="${teamBadgeStyle(team)}">${esc(teamAbbr(team))}</span>`;
+}
+function gameStatus(game) {
+  return game.status || (game.played ? "final" : "upcoming");
+}
+function scoreText(game) {
+  const status = gameStatus(game);
+  const hs = Number.isFinite(Number(game.homeScore)) ? Number(game.homeScore) : "—";
+  const as = Number.isFinite(Number(game.awayScore)) ? Number(game.awayScore) : "—";
+  if (status === "final") return `${hs} - ${as}`;
+  if (status === "live") return `LIVE ${hs} - ${as}`;
+  return game.note || game.time || "Scheduled";
+}
+function gameResult(game) {
+  if (gameStatus(game) !== "final" || !Number.isFinite(Number(game.homeScore)) || !Number.isFinite(Number(game.awayScore))) return "";
+  if (Number(game.homeScore) > Number(game.awayScore)) return "home";
+  if (Number(game.homeScore) < Number(game.awayScore)) return "away";
+  return "tie";
+}
+function formatRecord(row) {
+  return `${row.wins}-${row.losses}${row.ties ? `-${row.ties}` : ""}`;
+}
+function currentBackend() {
+  return state.data?.site?.backend || {};
+}
+function backendReady() {
+  const b = currentBackend();
+  return !!(b.enabled && b.url && b.anonKey && b.table && b.rowId);
 }
 function routeFromHash() {
   const hash = location.hash.replace(/^#\/?/, "");
   if (!hash) return { page: "home", slug: "" };
   const parts = hash.split("/").filter(Boolean);
-  if (!parts.length) return { page: "home", slug: "" };
-  return { page: parts[0], slug: parts.slice(1).join("/") };
+  return { page: parts[0] || "home", slug: parts.slice(1).join("/") };
 }
-function navigate(page, slug = "") {
+function go(page, slug = "") {
   location.hash = slug ? `#/${page}/${slug}` : `#/${page}`;
 }
 function setTeamTab(slug, tab) {
@@ -109,11 +147,66 @@ function setSearch(v) {
   state.ui.search = v;
   render();
 }
-function parseGameStatus(g) {
-  return g.status || (g.played ? "final" : (g.live ? "live" : "upcoming"));
+function setAdminWeek(v) {
+  state.ui.adminWeek = Number(v);
+  render();
 }
-function gameTeamSlug(name) {
-  return slugify(name);
+function setAdminDivision(v) {
+  state.ui.adminDivision = v;
+  state.ui.adminWeek = Number(state.ui.adminWeek || currentWeek());
+  render();
+}
+function setAdminTeam(v) {
+  state.ui.adminTeam = v;
+  render();
+}
+function setStatusFilter(v) {
+  state.ui.statusFilter = v;
+  render();
+}
+function addDays(start, days) {
+  const d = new Date(start);
+  d.setDate(d.getDate() + days);
+  return d;
+}
+function lastUpdatedText() {
+  return state.data?.site?.lastUpdated || new Date().toISOString().slice(0, 10);
+}
+
+function normalizeData(raw) {
+  const data = clone(raw || {});
+  data.site = Object.assign({
+    name: "NTFL",
+    season: "Season 3",
+    currentWeek: 3,
+    subtitle: "A clean public league hub built for daily updates and public publishing.",
+    lastUpdated: new Date().toISOString().slice(0, 10),
+    brand: { abbr: "NTFL", primary: "#0B2C5B", accent: "#D72638", surface: "#0f172a" },
+    backend: { enabled: false, provider: "supabase", url: "", anonKey: "", table: "site_state", rowId: "ntfl", syncField: "payload" }
+  }, data.site || {});
+  data.divisions = Array.isArray(data.divisions) ? data.divisions : [];
+  data.games = Array.isArray(data.games) ? data.games : [];
+  data.rankings = Array.isArray(data.rankings) ? data.rankings : [];
+  data.awards = Array.isArray(data.awards) ? data.awards : [];
+  data.history = Array.isArray(data.history) ? data.history : [];
+  data.hallOfFame = Array.isArray(data.hallOfFame) ? data.hallOfFame : [];
+  data.teams = data.teams && !Array.isArray(data.teams) ? data.teams : {};
+
+  Object.values(data.teams).forEach(t => {
+    const slug = t.slug || slugify(t.name);
+    t.slug = slug;
+    t.name = t.name || slug;
+    t.abbr = (t.abbr || t.name).toUpperCase();
+    t.primaryColor = t.primaryColor || "#1d4ed8";
+    t.secondaryColor = t.secondaryColor || "#ef4444";
+    t.headCoach = t.headCoach || "TBD";
+    t.assistantCoach = t.assistantCoach || "";
+    t.notes = t.notes || "Use Admin to add a team rundown.";
+    t.division = t.division || "";
+  });
+
+  rebuildDerived(data);
+  return data;
 }
 
 function rebuildDerived(data) {
@@ -138,52 +231,42 @@ function rebuildDerived(data) {
   });
 
   const finalsByTeam = {};
-  const scheduleByTeam = {};
-
   (data.games || []).forEach(game => {
-    const status = parseGameStatus(game);
-    game.status = status;
-    game.played = status === "final";
-    const homeSlug = gameTeamSlug(game.home);
-    const awaySlug = gameTeamSlug(game.away);
-    const week = Number(game.weekNumber || weekNum(game.week) || 0);
-    const weekLabel = game.week || `W${week || ""}`.trim();
+    game.status = game.status || (Number.isFinite(Number(game.homeScore)) && Number.isFinite(Number(game.awayScore)) ? "final" : "upcoming");
+    const homeSlug = teamRouteSlug(game.home);
+    const awaySlug = teamRouteSlug(game.away);
+    const weekLabel = game.week || `W${game.weekNumber || ""}`;
     const scoreHome = Number.isFinite(Number(game.homeScore)) ? Number(game.homeScore) : null;
     const scoreAway = Number.isFinite(Number(game.awayScore)) ? Number(game.awayScore) : null;
-    const displayRaw = game.raw || (status === "final" && scoreHome !== null && scoreAway !== null ? `vs ${game.away} (${scoreHome}-${scoreAway})` : `vs ${game.away || "TBD"}`);
-    game.raw = displayRaw;
-    game.time = game.time || (status === "upcoming" ? "TBD" : (status === "live" ? "LIVE" : ""));
-    game.weekLabel = weekLabel;
 
     const homeEntry = {
-      week,
+      week: game.weekNumber || 0,
       weekLabel,
       opponent: game.away,
-      raw: game.home ? `vs ${game.away}${scoreHome !== null && scoreAway !== null ? ` (${scoreHome}-${scoreAway})` : ""}` : `@ ${game.away}`,
       home: true,
-      played: status === "final",
+      status: game.status,
       scoreFor: scoreHome,
       scoreAgainst: scoreAway,
-      result: status === "final" ? (scoreHome > scoreAway ? "W" : scoreHome < scoreAway ? "L" : "T") : (status === "live" ? "LIVE" : null),
-      status
+      note: game.note || game.time || "",
+      gameId: game.id,
+      time: game.time || ""
     };
     const awayEntry = {
-      week,
+      week: game.weekNumber || 0,
       weekLabel,
       opponent: game.home,
-      raw: game.away ? `@ ${game.home}${scoreHome !== null && scoreAway !== null ? ` (${scoreAway}-${scoreHome})` : ""}` : `vs ${game.home}`,
       home: false,
-      played: status === "final",
+      status: game.status,
       scoreFor: scoreAway,
       scoreAgainst: scoreHome,
-      result: status === "final" ? (scoreAway > scoreHome ? "W" : scoreAway < scoreHome ? "L" : "T") : (status === "live" ? "LIVE" : null),
-      status
+      note: game.note || game.time || "",
+      gameId: game.id,
+      time: game.time || ""
     };
 
     if (bySlug[homeSlug]) {
-      scheduleByTeam[homeSlug] = scheduleByTeam[homeSlug] || [];
-      scheduleByTeam[homeSlug].push(homeEntry);
-      if (status === "final" && scoreHome !== null && scoreAway !== null) {
+      bySlug[homeSlug].schedule.push(homeEntry);
+      if (game.status === "final" && scoreHome !== null && scoreAway !== null) {
         finalsByTeam[homeSlug] = finalsByTeam[homeSlug] || [];
         finalsByTeam[homeSlug].push(homeEntry);
         bySlug[homeSlug].gamesPlayed += 1;
@@ -195,9 +278,8 @@ function rebuildDerived(data) {
       }
     }
     if (bySlug[awaySlug]) {
-      scheduleByTeam[awaySlug] = scheduleByTeam[awaySlug] || [];
-      scheduleByTeam[awaySlug].push(awayEntry);
-      if (status === "final" && scoreHome !== null && scoreAway !== null) {
+      bySlug[awaySlug].schedule.push(awayEntry);
+      if (game.status === "final" && scoreHome !== null && scoreAway !== null) {
         finalsByTeam[awaySlug] = finalsByTeam[awaySlug] || [];
         finalsByTeam[awaySlug].push(awayEntry);
         bySlug[awaySlug].gamesPlayed += 1;
@@ -211,33 +293,34 @@ function rebuildDerived(data) {
   });
 
   Object.values(bySlug).forEach(team => {
+    team.schedule.sort((a, b) => a.week - b.week);
+    const finals = finalsByTeam[team.slug] || [];
+    finals.sort((a, b) => a.week - b.week);
+    team.last5 = finals.slice(-5).reverse();
     team.pointDiff = team.pointsFor - team.pointsAgainst;
     team.ppg = team.gamesPlayed ? team.pointsFor / team.gamesPlayed : 0;
     team.oppg = team.gamesPlayed ? team.pointsAgainst / team.gamesPlayed : 0;
-    team.schedule = (scheduleByTeam[team.slug] || []).sort((a, b) => a.week - b.week || a.weekLabel.localeCompare(b.weekLabel));
-    const finals = (finalsByTeam[team.slug] || []).sort((a, b) => a.week - b.week || a.weekLabel.localeCompare(b.weekLabel));
-    team.last5 = finals.slice(-5).reverse();
     if (finals.length) {
-      const end = finals[finals.length - 1];
-      const target = end.result;
-      let count = 0;
+      const last = finals[finals.length - 1].scoreFor > finals[finals.length - 1].scoreAgainst ? "W" :
+        finals[finals.length - 1].scoreFor < finals[finals.length - 1].scoreAgainst ? "L" : "T";
+      let streakCount = 0;
       for (let i = finals.length - 1; i >= 0; i--) {
-        if (finals[i].result !== target) break;
-        count++;
+        const cur = finals[i].scoreFor > finals[i].scoreAgainst ? "W" :
+          finals[i].scoreFor < finals[i].scoreAgainst ? "L" : "T";
+        if (cur !== last) break;
+        streakCount++;
       }
-      team.streak = `${target}${count}`;
-    } else {
-      team.streak = "—";
+      team.streak = `${last}${streakCount}`;
     }
-    team.divisionName = team.division || team.divisionName || "";
   });
 
   data.standings = Object.values(bySlug)
     .map(team => ({
       rank: 0,
       slug: team.slug,
+      abbr: team.abbr,
       team: team.name,
-      division: team.divisionName || team.division || "",
+      division: team.division || "",
       record: `${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ""}`,
       wins: team.wins,
       losses: team.losses,
@@ -249,84 +332,205 @@ function rebuildDerived(data) {
       oppg: Number(team.oppg.toFixed(1))
     }))
     .sort((a, b) => b.wins - a.wins || b.pointDiff - a.pointDiff || b.pointsFor - a.pointsFor || a.team.localeCompare(b.team))
-    .map((row, i) => ({ ...row, rank: i + 1 }));
+    .map((r, idx) => ({ ...r, rank: idx + 1 }));
 
-  // keep rankings in manual order but refresh stat fields
   const statsBySlug = Object.fromEntries(data.standings.map(s => [s.slug, s]));
-  if (Array.isArray(data.rankings)) {
-    data.rankings = [...data.rankings]
-      .sort((a, b) => Number(a.rank || 999) - Number(b.rank || 999))
-      .map((r, idx) => {
-        const stats = statsBySlug[r.slug || slugify(r.team)] || {};
-        return {
-          ...r,
-          rank: idx + 1,
-          slug: r.slug || slugify(r.team),
-          team: r.team || stats.team || "",
-          division: r.division || stats.division || "",
-          record: stats.record || r.record || "0-0",
-          pointsFor: stats.pointsFor ?? r.pointsFor ?? 0,
-          pointsAgainst: stats.pointsAgainst ?? r.pointsAgainst ?? 0,
-          pointDiff: stats.pointDiff ?? r.pointDiff ?? 0,
-          ppg: stats.ppg ?? r.ppg ?? 0,
-          oppg: stats.oppg ?? r.oppg ?? 0
-        };
-      });
-  }
-
-  return data;
-}
-
-function normalizeData(input) {
-  const data = clone(input || {});
-  data.site = Object.assign({
-    name: "NTFL",
-    season: "Season 3",
-    currentWeek: 1,
-    subtitle: "Modern editable league hub",
-    version: "modern-static-2026-07-23",
-    lastUpdated: new Date().toISOString().slice(0, 10)
-  }, data.site || {});
-  data.divisions = Array.isArray(data.divisions) ? data.divisions : [];
-  data.games = Array.isArray(data.games) ? data.games : [];
-  data.rankings = Array.isArray(data.rankings) ? data.rankings : [];
-  data.awards = Array.isArray(data.awards) ? data.awards : [];
-  data.history = Array.isArray(data.history) ? data.history : [];
-  data.hallOfFame = Array.isArray(data.hallOfFame) ? data.hallOfFame : [];
-  data.teams = data.teams && !Array.isArray(data.teams) ? data.teams : {};
-
-  Object.values(data.teams).forEach(team => {
-    team.name = team.name || team.slug || "";
-    team.slug = team.slug || slugify(team.name);
-    team.divisionName = team.divisionName || team.division || "";
-    team.headCoach = team.headCoach || "TBD";
-    team.assistantCoach = team.assistantCoach || "TBD";
-    team.notes = team.notes || "Add a short team rundown here from the admin dashboard.";
-  });
-
-  rebuildDerived(data);
-
-  return data;
+  data.rankings = (data.rankings && data.rankings.length ? [...data.rankings] : data.standings.map(s => ({
+    rank: s.rank, team: s.team, slug: s.slug, division: s.division, record: s.record,
+    pointDiff: s.pointDiff, pointsFor: s.pointsFor, pointsAgainst: s.pointsAgainst, ppg: s.ppg, oppg: s.oppg
+  })))
+    .sort((a, b) => Number(a.rank || 999) - Number(b.rank || 999))
+    .map((r, idx) => {
+      const s = statsBySlug[r.slug || slugify(r.team)] || {};
+      return {
+        ...r,
+        rank: idx + 1,
+        slug: r.slug || slugify(r.team),
+        team: r.team || s.team || "",
+        division: r.division || s.division || "",
+        record: s.record || r.record || "0-0",
+        pointDiff: s.pointDiff ?? r.pointDiff ?? 0,
+        pointsFor: s.pointsFor ?? r.pointsFor ?? 0,
+        pointsAgainst: s.pointsAgainst ?? r.pointsAgainst ?? 0,
+        ppg: s.ppg ?? r.ppg ?? 0,
+        oppg: s.oppg ?? r.oppg ?? 0
+      };
+    });
 }
 
 async function loadData() {
-  const res = await fetch(DATA_URL, { cache: "no-store" });
-  if (!res.ok) throw new Error("Could not load data");
-  const base = normalizeData(await res.json());
-  if (isAuthed()) {
-    const draft = loadDraft();
-    if (draft) {
-      try { return normalizeData(draft); } catch {}
+  const draft = loadDraft();
+  if (draft) {
+    try { return normalizeData(draft); } catch (e) {}
+  }
+  const localRes = await fetch(DATA_URL, { cache: "no-store" });
+  if (!localRes.ok) throw new Error("Could not load data");
+  const localData = normalizeData(await localRes.json());
+  const backend = localData.site.backend || {};
+  if (backend.enabled && backend.url && backend.anonKey) {
+    try {
+      const api = `${backend.url.replace(/\/$/, "")}/rest/v1/${backend.table}?${backend.syncField}=not.is.null&select=${backend.syncField}&id=eq.${encodeURIComponent(backend.rowId)}&limit=1`;
+      const res = await fetch(api, {
+        headers: {
+          apikey: backend.anonKey,
+          Authorization: `Bearer ${backend.anonKey}`
+        }
+      });
+      if (res.ok) {
+        const rows = await res.json();
+        const payload = rows?.[0]?.[backend.syncField];
+        if (payload) return normalizeData(payload);
+      }
+    } catch (e) {
+      console.warn("Backend load failed; using local JSON.", e);
     }
   }
-  return base;
+  return localData;
 }
 
-function saveToBrowser() {
+function saveBrowserDraft() {
   saveDraft(state.data);
+  localStorage.setItem(STORAGE_KEY + ":savedAt", new Date().toISOString());
+}
+
+function syncSiteInputs() {
+  const card = document.getElementById("site-editor");
+  if (!card) return;
+  const inputs = [...card.querySelectorAll("input, textarea, select")];
+  const map = Object.fromEntries(inputs.map(i => [i.name, i.value]));
+  state.data.site.name = map.siteName || state.data.site.name;
+  state.data.site.season = map.siteSeason || state.data.site.season;
+  state.data.site.currentWeek = Number(map.siteWeek || state.data.site.currentWeek || 1);
+  state.data.site.subtitle = map.siteSubtitle || state.data.site.subtitle;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  state.data.site.backend.enabled = !!card.querySelector('[name="backendEnabled"]')?.checked;
+  state.data.site.backend.url = map.backendUrl || "";
+  state.data.site.backend.anonKey = map.backendKey || "";
+  state.data.site.backend.table = map.backendTable || "site_state";
+  state.data.site.backend.rowId = map.backendRowId || "ntfl";
+}
+
+function syncGames() {
+  const list = document.getElementById("games-editor");
+  if (!list) return;
+  [...list.querySelectorAll(".game-edit")].forEach(row => {
+    const id = row.dataset.gameId;
+    const game = state.data.games.find(g => g.id === id);
+    if (!game) return;
+    const get = f => row.querySelector(`[data-field="${f}"]`)?.value ?? "";
+    game.homeScore = get("homeScore") === "" ? null : Number(get("homeScore"));
+    game.awayScore = get("awayScore") === "" ? null : Number(get("awayScore"));
+    game.status = get("status") || "upcoming";
+    game.time = get("time") || "";
+    game.note = get("note") || "";
+  });
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  rebuildDerived(state.data);
+}
+
+function syncTeam() {
+  const card = document.getElementById("team-editor");
+  if (!card) return;
+  const team = getTeam(state.ui.adminTeam);
+  if (!team) return;
+  team.headCoach = card.querySelector('[name="headCoach"]')?.value || "TBD";
+  team.assistantCoach = card.querySelector('[name="assistantCoach"]')?.value || "";
+  team.notes = card.querySelector('[name="notes"]')?.value || "";
+  team.abbr = (card.querySelector('[name="abbr"]')?.value || team.abbr || "").toUpperCase();
+  team.primaryColor = card.querySelector('[name="primaryColor"]')?.value || team.primaryColor;
+  team.secondaryColor = card.querySelector('[name="secondaryColor"]')?.value || team.secondaryColor;
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  rebuildDerived(state.data);
+}
+
+function syncAwards() {
+  const rows = [...document.querySelectorAll("#awards-editor [data-award-row]")];
+  state.data.awards = rows.map(row => ({
+    category: row.querySelector('[data-field="category"]')?.value || "",
+    winner: row.querySelector('[data-field="winner"]')?.value || "",
+    team: row.querySelector('[data-field="team"]')?.value || ""
+  }));
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+}
+
+function syncHistory() {
+  const rows = [...document.querySelectorAll("#history-editor [data-history-row]")];
+  state.data.history = rows.map(row => ({
+    season: row.querySelector('[data-field="season"]')?.value || "",
+    champion: row.querySelector('[data-field="champion"]')?.value || "",
+    record: row.querySelector('[data-field="record"]')?.value || "",
+    notes: row.querySelector('[data-field="notes"]')?.value || ""
+  }));
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+}
+
+function syncHOF() {
+  const rows = [...document.querySelectorAll("#hof-editor [data-hof-row]")];
+  state.data.hallOfFame = rows.map(row => ({
+    name: row.querySelector('[data-field="name"]')?.value || "",
+    team: row.querySelector('[data-field="team"]')?.value || "",
+    honor: row.querySelector('[data-field="honor"]')?.value || "",
+    notes: row.querySelector('[data-field="notes"]')?.value || ""
+  }));
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+}
+
+async function publishPublic() {
+  syncSiteInputs();
+  syncGames();
+  syncTeam();
+  syncAwards();
+  syncHistory();
+  syncHOF();
+  rebuildDerived(state.data);
+  saveBrowserDraft();
+
+  const b = currentBackend();
+  if (!b.enabled || !b.url || !b.anonKey) {
+    alert("Public publish is not connected yet. Save the backend settings first.");
+    return;
+  }
+
+  const base = b.url.replace(/\/$/, "");
+  const headers = {
+    apikey: b.anonKey,
+    Authorization: `Bearer ${b.anonKey}`,
+    "Content-Type": "application/json",
+    Prefer: "resolution=merge-duplicates"
+  };
+  const payload = {};
+  payload.id = b.rowId;
+  payload[b.syncField || "payload"] = state.data;
+  payload.updated_at = new Date().toISOString();
+
+  let res = await fetch(`${base}/rest/v1/${b.table}?on_conflict=id`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    res = await fetch(`${base}/rest/v1/${b.table}?id=eq.${encodeURIComponent(b.rowId)}`, {
+      method: "PATCH",
+      headers,
+      body: JSON.stringify({ [b.syncField || "payload"]: state.data, updated_at: new Date().toISOString() })
+    });
+  }
+  if (!res.ok) {
+    const txt = await res.text().catch(() => "");
+    alert(`Publish failed. Check your backend settings.\n${txt}`);
+    return;
+  }
+  alert("Published publicly.");
 }
 
 function downloadJSON() {
+  syncSiteInputs();
+  syncGames();
+  syncTeam();
+  syncAwards();
+  syncHistory();
+  syncHOF();
+  rebuildDerived(state.data);
   const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
@@ -338,78 +542,120 @@ function downloadJSON() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function teamBySlug(slug) {
-  return state.data?.teams?.[slug];
+function saveAllDraft() {
+  syncSiteInputs();
+  syncGames();
+  syncTeam();
+  syncAwards();
+  syncHistory();
+  syncHOF();
+  rebuildDerived(state.data);
+  saveBrowserDraft();
+  render();
+  alert("Draft saved in this browser.");
 }
-function divisionBySlug(slug) {
-  return state.data?.divisions?.find(d => d.slug === slug);
+
+function saveSite() {
+  syncSiteInputs();
+  rebuildDerived(state.data);
+  saveBrowserDraft();
+  render();
 }
-function selectedTeam() {
-  return teamBySlug(state.route.slug);
+function saveGames() {
+  syncGames();
+  saveBrowserDraft();
+  render();
+}
+function saveTeam() {
+  syncTeam();
+  saveBrowserDraft();
+  render();
+}
+function saveAwards() {
+  syncAwards();
+  saveBrowserDraft();
+  render();
+}
+function saveHistory() {
+  syncHistory();
+  saveBrowserDraft();
+  render();
+}
+function saveHOF() {
+  syncHOF();
+  saveBrowserDraft();
+  render();
+}
+
+function login(ev) {
+  ev.preventDefault();
+  const form = ev.target;
+  const user = form.username?.value?.trim();
+  const pass = form.password?.value?.trim();
+  if (user === DEMO_USER && pass === DEMO_PASS) {
+    setAuthed(true);
+    render();
+    return;
+  }
+  alert("Login failed.");
+}
+function logout() {
+  setAuthed(false);
+  render();
+}
+
+function addAward() {
+  state.data.awards.push({ category: "", winner: "", team: "" });
+  saveBrowserDraft();
+  render();
+}
+function addHistory() {
+  state.data.history.push({ season: "", champion: "", record: "", notes: "" });
+  saveBrowserDraft();
+  render();
+}
+function addHOF() {
+  state.data.hallOfFame.push({ name: "", team: "", honor: "", notes: "" });
+  saveBrowserDraft();
+  render();
+}
+
+function moveRank(from, to) {
+  if (to < 0 || to >= state.data.rankings.length || from === to) return;
+  const list = [...state.data.rankings];
+  const [item] = list.splice(from, 1);
+  list.splice(to, 0, item);
+  state.data.rankings = list.map((r, i) => ({ ...r, rank: i + 1 }));
+  saveBrowserDraft();
+  render();
+}
+
+function dragRankStart(ev, idx) {
+  state.ui.adminRankDrag = idx;
+  ev.dataTransfer.effectAllowed = "move";
+  ev.dataTransfer.setData("text/plain", String(idx));
+}
+function dragRankOver(ev) {
+  ev.preventDefault();
+  ev.dataTransfer.dropEffect = "move";
+}
+function dropRank(ev, idx) {
+  ev.preventDefault();
+  const from = Number(ev.dataTransfer.getData("text/plain") || state.ui.adminRankDrag);
+  moveRank(from, idx);
+}
+
+function teamMark(team) {
+  return `<div class="team-mark" style="${teamBadgeStyle(team)}">${esc(teamAbbr(team))}</div>`;
 }
 function teamStatCards(team) {
   return `
-    <div class="stat-card"><span>Record</span><strong>${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ""}</strong></div>
+    <div class="stat-card"><span>Record</span><strong>${formatRecord(team)}</strong></div>
     <div class="stat-card"><span>Points For</span><strong>${team.pointsFor}</strong></div>
     <div class="stat-card"><span>Points Against</span><strong>${team.pointsAgainst}</strong></div>
-    <div class="stat-card"><span>PPG</span><strong>${team.ppg.toFixed(1)}</strong></div>
-    <div class="stat-card"><span>OPPG</span><strong>${team.oppg.toFixed(1)}</strong></div>
+    <div class="stat-card"><span>PPG</span><strong>${Number(team.ppg).toFixed(1)}</strong></div>
+    <div class="stat-card"><span>OPPG</span><strong>${Number(team.oppg).toFixed(1)}</strong></div>
     <div class="stat-card"><span>Diff</span><strong>${team.pointDiff >= 0 ? "+" : ""}${team.pointDiff}</strong></div>
-  `;
-}
-function teamBadge(name) {
-  const parts = String(name || "").split(/\s+/).filter(Boolean);
-  const text = parts.slice(0, 2).map(p => p[0]).join("").toUpperCase();
-  return text || "NT";
-}
-function gameStatusPill(game) {
-  const status = parseGameStatus(game);
-  if (status === "final") return `<span class="pill good">FINAL</span>`;
-  if (status === "live") return `<span class="pill live">LIVE</span>`;
-  return `<span class="pill">${esc(game.time || "UPCOMING")}</span>`;
-}
-function gameScoreText(game) {
-  const status = parseGameStatus(game);
-  const a = Number.isFinite(game.homeScore) ? game.homeScore : "—";
-  const b = Number.isFinite(game.awayScore) ? game.awayScore : "—";
-  if (status === "final") return `${a} - ${b}`;
-  if (status === "live") return `LIVE ${a} - ${b}`;
-  return game.time || "Scheduled";
-}
-function gameCard(game) {
-  const home = state.data.teams[gameTeamSlug(game.home)] || { name: game.home, slug: gameTeamSlug(game.home) };
-  const away = state.data.teams[gameTeamSlug(game.away)] || { name: game.away, slug: gameTeamSlug(game.away) };
-  const status = parseGameStatus(game);
-  const homeScore = Number.isFinite(game.homeScore) ? game.homeScore : null;
-  const awayScore = Number.isFinite(game.awayScore) ? game.awayScore : null;
-  const winnerSlug = status === "final" && homeScore !== null && awayScore !== null ? (homeScore > awayScore ? home.slug : away.slug) : "";
-  return `
-    <div class="card game-card ${status}">
-      <div class="row between">
-        <div class="row tight">
-          <span class="pill">${esc(game.weekLabel || `W${game.weekNumber || ""}`)}</span>
-          ${gameStatusPill(game)}
-        </div>
-        <span class="muted tiny">${esc(game.division || "")}</span>
-      </div>
-      <div class="game-teams">
-        <a class="game-team ${winnerSlug === home.slug ? "winner" : ""}" href="#/team/${home.slug}">
-          <span class="badge" style="background:${hashColor(home.name)}">${teamBadge(home.name)}</span>
-          <span>
-            <strong>${esc(home.name)}</strong>
-            <small>${game.home === home.name ? "Home" : ""}</small>
-          </span>
-        </a>
-        <div class="game-score ${status}">${esc(gameScoreText(game))}</div>
-        <a class="game-team ${winnerSlug === away.slug ? "winner" : ""}" href="#/team/${away.slug}">
-          <span class="badge" style="background:${hashColor(away.name)}">${teamBadge(away.name)}</span>
-          <span>
-            <strong>${esc(away.name)}</strong>
-            <small>${game.away === away.name ? "Away" : ""}</small>
-          </span>
-        </a>
-      </div>
-    </div>
   `;
 }
 function standingsTable(rows, limit = 32) {
@@ -422,7 +668,7 @@ function standingsTable(rows, limit = 32) {
           </tr>
         </thead>
         <tbody>
-          ${rows.slice(0, limit).map(r => `
+          ${(rows || []).slice(0, limit).map(r => `
             <tr>
               <td>${r.rank}</td>
               <td><a href="#/team/${r.slug}">${esc(r.team)}</a></td>
@@ -431,7 +677,7 @@ function standingsTable(rows, limit = 32) {
               <td>${r.pointsFor}</td>
               <td>${r.pointsAgainst}</td>
               <td class="${r.pointDiff >= 0 ? "good" : "bad"}">${r.pointDiff >= 0 ? "+" : ""}${r.pointDiff}</td>
-              <td>${r.ppg.toFixed ? r.ppg.toFixed(1) : Number(r.ppg).toFixed(1)}</td>
+              <td>${Number(r.ppg).toFixed(1)}</td>
             </tr>
           `).join("")}
         </tbody>
@@ -439,615 +685,49 @@ function standingsTable(rows, limit = 32) {
     </div>
   `;
 }
-function homePage() {
-  const featured = (state.data.games || []).filter(g => Number(g.weekNumber) === currentWeek()).slice(0, 4);
-  const top = (state.data.standings || []).slice(0, 4);
-  const rankTop = (state.data.rankings || []).slice(0, 6);
-  const liveCount = (state.data.games || []).filter(g => parseGameStatus(g) === "live" && Number(g.weekNumber) === currentWeek()).length;
+function gameCard(game) {
+  const home = getTeam(teamRouteSlug(game.home)) || { name: game.home, slug: teamRouteSlug(game.home), abbr: game.home.slice(0,3).toUpperCase(), primaryColor: "#1d4ed8", secondaryColor: "#ef4444" };
+  const away = getTeam(teamRouteSlug(game.away)) || { name: game.away, slug: teamRouteSlug(game.away), abbr: game.away.slice(0,3).toUpperCase(), primaryColor: "#1d4ed8", secondaryColor: "#ef4444" };
+  const res = gameResult(game);
   return `
-    <section class="hero">
-      <div class="hero-card">
-        <div class="hero-logo">
-          <img src="${loadLogoSrc()}" alt="NTFL logo" onerror="this.src='assets/logo.svg'">
+    <article class="card game-card ${gameStatus(game)}">
+      <div class="row between">
+        <div class="row tight">
+          <span class="pill">${esc(game.week || `W${game.weekNumber}`)}</span>
+          <span class="pill ${statusPillClass(gameStatus(game))}">${esc(statusLabel(gameStatus(game)))}</span>
         </div>
-        <div class="hero-copy">
-          <span class="eyebrow">${esc(state.data.site.season)} • Week ${currentWeek()} • ${esc(state.data.site.version)}</span>
-          <h1>${esc(state.data.site.name)}</h1>
-          <p>${esc(state.data.site.subtitle || "Modern editable league hub for teams, scores, rankings, awards, and history.")}</p>
-          <div class="hero-actions">
-            <a class="btn primary" href="#/teams">Browse Teams</a>
-            <a class="btn" href="#/schedule">View Schedule</a>
-            <a class="btn" href="#/standings">Standings</a>
-          </div>
-        </div>
+        <span class="muted tiny">${esc(game.division)}</span>
       </div>
-    </section>
-
-    <section class="grid stats-grid">
-      <div class="stat-card"><span>Teams</span><strong>${Object.keys(state.data.teams || {}).length}</strong></div>
-      <div class="stat-card"><span>Current Week</span><strong>${currentWeek()}</strong></div>
-      <div class="stat-card"><span>Live Games</span><strong>${liveCount}</strong></div>
-      <div class="stat-card"><span>Top Team</span><strong>${top[0] ? esc(top[0].team) : "—"}</strong></div>
-    </section>
-
-    <section class="section-grid">
-      <div class="section-head">
-        <h2>Featured Week ${currentWeek()} Games</h2>
-        <a href="#/schedule">See all</a>
-      </div>
-      <div class="grid cards-2">${featured.map(gameCard).join("") || `<div class="card empty">No games found for this week.</div>`}</div>
-    </section>
-
-    <section class="section-grid two-col">
-      <div>
-        <div class="section-head">
-          <h2>Standings Preview</h2>
-          <a href="#/standings">Full table</a>
-        </div>
-        ${standingsTable(top, 4)}
-      </div>
-      <div>
-        <div class="section-head">
-          <h2>Power Rankings</h2>
-          <a href="#/rankings">Full rankings</a>
-        </div>
-        <div class="grid stacked">
-          ${rankTop.map(r => `
-            <a class="mini-row" href="#/team/${r.slug}">
-              <div class="mini-rank">#${r.rank}</div>
-              <div class="mini-body">
-                <strong>${esc(r.team)}</strong>
-                <span>${esc(r.record)} • ${r.pointDiff >= 0 ? "+" : ""}${r.pointDiff} diff</span>
-              </div>
-            </a>
-          `).join("")}
-        </div>
-      </div>
-    </section>
-
-    <section class="section-grid">
-      <div class="section-head">
-        <h2>Quick Team Access</h2>
-        <a href="#/teams">All teams</a>
-      </div>
-      <div class="grid team-grid">
-        ${(teamsArray().slice(0, 8)).map(team => `
-          <a class="team-card" href="#/team/${team.slug}">
-            <div class="team-badge" style="background:${hashColor(team.name)}">${teamBadge(team.name)}</div>
-            <div>
-              <strong>${esc(team.name)}</strong>
-              <span>${esc(team.divisionName || team.division || "")}</span>
-              <small>${esc(team.wins)}-${esc(team.losses)}${team.ties ? `-${team.ties}` : ""}</small>
-            </div>
-          </a>
-        `).join("")}
-      </div>
-    </section>
-  `;
-}
-
-function teamsPage() {
-  const search = state.ui.search.toLowerCase();
-  const teams = teamsArray().filter(t => {
-    const s = `${t.name} ${t.divisionName || t.division || ""} ${t.headCoach || ""} ${t.assistantCoach || ""}`.toLowerCase();
-    return !search || s.includes(search);
-  });
-  const divisions = [...new Set(teamsArray().map(t => t.divisionName || t.division || "").filter(Boolean))];
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">League</span>
-        <h1>Teams</h1>
-        <p>Click any team for a full rundown, schedule, coaches, and PPG.</p>
-      </div>
-      <div class="page-tools">
-        <input class="search" type="search" placeholder="Search teams or coaches" value="${esc(state.ui.search)}" oninput="NTFL.searchTeams(this.value)">
-      </div>
-    </section>
-    <div class="chip-row">
-      <button class="chip ${state.ui.search ? "" : "active"}" onclick="NTFL.searchTeams('')">All</button>
-      ${divisions.map(d => `<button class="chip" onclick="NTFL.searchTeams('${esc(d)}')">${esc(d)}</button>`).join("")}
-    </div>
-    <section class="grid team-grid large">
-      ${teams.map(team => `
-        <a class="team-card large" href="#/team/${team.slug}">
-          <div class="team-badge large" style="background:${hashColor(team.name)}">${teamBadge(team.name)}</div>
-          <div class="team-info">
-            <strong>${esc(team.name)}</strong>
-            <span>${esc(team.divisionName || team.division || "")}</span>
-            <small>${team.wins}-${team.losses}${team.ties ? `-${team.ties}` : ""} • PPG ${Number(team.ppg).toFixed(1)}</small>
-            <small>${esc(team.headCoach || "TBD")}${team.assistantCoach ? ` • ${esc(team.assistantCoach)}` : ""}</small>
+      <div class="game-line">
+        <a class="game-team ${res === "home" ? "winner" : ""}" href="#/team/${home.slug}">
+          ${teamMark(home)}
+          <div>
+            <strong>${esc(home.name)}</strong>
+            <small>${esc(home.abbr)}</small>
           </div>
         </a>
-      `).join("")}
-    </section>
-  `;
-}
-
-function teamPage() {
-  const team = selectedTeam();
-  if (!team) return `<div class="card empty">Team not found.</div>`;
-  const tab = state.ui.teamTabs[team.slug] || "overview";
-  const schedule = team.schedule || [];
-  const recent = team.last5 || [];
-  const content = {
-    overview: `
-      <div class="grid stats-grid">${teamStatCards(team)}</div>
-      <div class="grid two-col">
-        <div class="card">
-          <h3>Season Snapshot</h3>
-          <p class="muted">This page updates automatically from the schedule. Final games count toward the record and PPG.</p>
-          <div class="grid stacked">
-            ${recent.length ? recent.map(g => `
-              <div class="mini-row">
-                <div class="mini-rank ${g.result === "W" ? "good" : g.result === "L" ? "bad" : ""}">${g.result || "—"}</div>
-                <div class="mini-body">
-                  <strong>${esc(g.weekLabel)} vs ${esc(g.opponent)}</strong>
-                  <span>${g.scoreFor ?? "—"} - ${g.scoreAgainst ?? "—"}</span>
-                </div>
-              </div>
-            `).join("") : `<div class="empty">No completed games yet.</div>`}
-          </div>
-        </div>
-        <div class="card">
-          <h3>Rundown</h3>
-          <div class="notes-box">${esc(team.notes || "No notes yet.")}</div>
-        </div>
-      </div>
-    `,
-    schedule: `
-      <div class="grid stacked">
-        ${schedule.map(g => `
-          <div class="card schedule-row ${g.status}">
-            <div class="row between">
-              <div class="row tight">
-                <span class="pill">${esc(g.weekLabel)}</span>
-                <span class="pill ${g.status}">${esc(statusLabel(g.status))}</span>
-              </div>
-              <span class="muted">${esc(g.raw || "")}</span>
-            </div>
-            <div class="game-teams compact">
-              <div class="game-team compact ${g.result === "W" && g.home ? "winner" : ""}">
-                <strong>${g.home ? "vs" : "@"} ${esc(g.opponent)}</strong>
-              </div>
-              <div class="game-score ${g.status}">${esc(gameScoreText({ ...g, homeScore: g.scoreFor, awayScore: g.scoreAgainst, status: g.status }))}</div>
-              <div class="game-team compact ${g.result === "W" && !g.home ? "winner" : ""}">
-                <strong>${g.home ? "Home" : "Away"}</strong>
-              </div>
-            </div>
-          </div>
-        `).join("") || `<div class="card empty">No schedule available.</div>`}
-      </div>
-    `,
-    ppg: `
-      <div class="grid stats-grid">
-        <div class="stat-card"><span>Offense PPG</span><strong>${team.ppg.toFixed(1)}</strong></div>
-        <div class="stat-card"><span>Defense PPG</span><strong>${team.oppg.toFixed(1)}</strong></div>
-        <div class="stat-card"><span>Point Diff</span><strong>${team.pointDiff >= 0 ? "+" : ""}${team.pointDiff}</strong></div>
-        <div class="stat-card"><span>Games Played</span><strong>${team.gamesPlayed}</strong></div>
-      </div>
-      <div class="card">
-        <h3>PPG Breakdown</h3>
-        <div class="bar-row"><span>Offense</span><div class="bar"><div style="width:${Math.min(100, (team.ppg / 50) * 100)}%"></div></div><strong>${team.ppg.toFixed(1)}</strong></div>
-        <div class="bar-row"><span>Defense</span><div class="bar"><div style="width:${Math.min(100, (team.oppg / 50) * 100)}%"></div></div><strong>${team.oppg.toFixed(1)}</strong></div>
-      </div>
-    `,
-    coaches: `
-      <div class="grid cols-2">
-        <div class="card">
-          <h3>Head Coach</h3>
-          <p class="coach-tag">${esc(team.headCoach || "TBD")}</p>
-        </div>
-        <div class="card">
-          <h3>Assistant Coach</h3>
-          <p class="coach-tag">${esc(team.assistantCoach || "TBD")}</p>
-        </div>
-      </div>
-    `,
-    notes: `
-      <div class="card">
-        <h3>Team Notes</h3>
-        <div class="notes-box">${esc(team.notes || "No notes yet.")}</div>
-      </div>
-    `
-  }[tab] || content.overview;
-
-  return `
-    <section class="page-head team-head">
-      <div class="team-hero">
-        <div class="team-badge large" style="background:${hashColor(team.name)}">${teamBadge(team.name)}</div>
-        <div>
-          <span class="eyebrow">${esc(team.divisionName || team.division || "")}</span>
-          <h1>${esc(team.name)}</h1>
-          <p>${esc(team.headCoach || "TBD")}${team.assistantCoach ? ` • ${esc(team.assistantCoach)}` : ""}</p>
-        </div>
-      </div>
-      <div class="page-tools">
-        <span class="pill">${esc(team.wins)}-${esc(team.losses)}${team.ties ? `-${team.ties}` : ""}</span>
-        <span class="pill">PPG ${team.ppg.toFixed(1)}</span>
-      </div>
-    </section>
-
-    <div class="tabs">
-      ${["overview","schedule","ppg","coaches","notes"].map(t => `<button class="tab ${tab===t?"active":""}" onclick="NTFL.setTeamTab('${team.slug}','${t}')">${t.toUpperCase()}</button>`).join("")}
-    </div>
-
-    <section class="section-grid">${content}</section>
-  `;
-}
-
-function schedulePage() {
-  const weeks = [...new Set((state.data.games || []).map(g => Number(g.weekNumber || weekNum(g.week) || 0)).filter(Boolean))].sort((a,b) => a-b);
-  const week = state.ui.adminWeek || currentWeek();
-  const games = (state.data.games || [])
-    .filter(g => Number(g.weekNumber || weekNum(g.week) || 0) === week)
-    .sort((a,b) => (a.division || "").localeCompare(b.division || "") || (a.home || "").localeCompare(b.home || ""));
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">League</span>
-        <h1>Schedule</h1>
-        <p>Updated game cards with live / final / upcoming status.</p>
-      </div>
-      <div class="page-tools">
-        <select class="select" onchange="NTFL.setAdminWeek(this.value)">
-          ${weeks.map(w => `<option value="${w}" ${w===week ? "selected" : ""}>Week ${w}</option>`).join("")}
-        </select>
-      </div>
-    </section>
-    <div class="grid stacked">${games.map(gameCard).join("") || `<div class="card empty">Schedule not found.</div>`}</div>
-  `;
-}
-
-function standingsPage() {
-  const rows = state.data.standings || [];
-  const divisions = [...new Set(rows.map(r => r.division).filter(Boolean))];
-  const filter = state.ui.search && divisions.includes(state.ui.search) ? state.ui.search : "All";
-  const filtered = filter === "All" ? rows : rows.filter(r => r.division === filter);
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">League</span>
-        <h1>Standings</h1>
-        <p>Automatically recalculated from final scores.</p>
-      </div>
-    </section>
-    <div class="chip-row">
-      <button class="chip ${filter==="All" ? "active" : ""}" onclick="NTFL.searchTeams('')">All</button>
-      ${divisions.map(d => `<button class="chip ${filter===d ? "active" : ""}" onclick="NTFL.searchTeams('${esc(d)}')">${esc(d)}</button>`).join("")}
-    </div>
-    ${standingsTable(filtered, filtered.length)}
-  `;
-}
-
-function rankingsPage() {
-  const rows = state.data.rankings || [];
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">League</span>
-        <h1>Rankings</h1>
-        <p>Manual order, stored in the dashboard and shown publicly.</p>
-      </div>
-    </section>
-    <div class="grid stacked">
-      ${rows.map(r => `
-        <a class="mini-row ranking-row" href="#/team/${r.slug}">
-          <div class="mini-rank">#${r.rank}</div>
-          <div class="mini-body">
-            <strong>${esc(r.team)}</strong>
-            <span>${esc(r.record)} • ${esc(r.division)} • ${r.pointDiff >= 0 ? "+" : ""}${r.pointDiff} diff</span>
+        <div class="game-score ${gameStatus(game)}">${esc(scoreText(game))}</div>
+        <a class="game-team ${res === "away" ? "winner" : ""}" href="#/team/${away.slug}">
+          ${teamMark(away)}
+          <div>
+            <strong>${esc(away.name)}</strong>
+            <small>${esc(away.abbr)}</small>
           </div>
         </a>
-      `).join("")}
-    </div>
+      </div>
+      ${game.note ? `<div class="muted small">${esc(game.note)}</div>` : ""}
+    </article>
   `;
 }
-
-function awardsPage() {
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">Archive</span>
-        <h1>Awards</h1>
-        <p>Editable league awards and honors.</p>
-      </div>
-    </section>
-    <div class="grid cols-2">
-      ${(state.data.awards || []).map(a => `
-        <div class="card">
-          <h3>${esc(a.category || a.name || "Award")}</h3>
-          <p class="award-winner">${esc(a.winner || "TBD")}</p>
-          <p class="muted">${esc(a.team || "TBD")}</p>
-        </div>
-      `).join("") || `<div class="card empty">No awards added yet.</div>`}
-    </div>
-  `;
-}
-
-function historyPage() {
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">Archive</span>
-        <h1>History</h1>
-        <p>Season archive, champions, and notes.</p>
-      </div>
-    </section>
-    <div class="grid stacked">
-      ${(state.data.history || []).map(h => `
-        <div class="card">
-          <div class="row between">
-            <h3>${esc(h.season || "Season")}</h3>
-            <span class="pill">${esc(h.record || "TBD")}</span>
-          </div>
-          <p><strong>Champion:</strong> ${esc(h.champion || "TBD")}</p>
-          <p class="muted">${esc(h.notes || "")}</p>
-        </div>
-      `).join("") || `<div class="card empty">No history added yet.</div>`}
-    </div>
-  `;
-}
-
-function hofPage() {
-  return `
-    <section class="page-head">
-      <div>
-        <span class="eyebrow">Archive</span>
-        <h1>Hall of Fame</h1>
-        <p>League legends and special honors.</p>
-      </div>
-    </section>
-    <div class="grid cols-2">
-      ${(state.data.hallOfFame || []).map(item => `
-        <div class="card">
-          <h3>${esc(item.name || "Honoree")}</h3>
-          <p>${esc(item.team || "")}</p>
-          <p class="muted">${esc(item.notes || item.honor || "")}</p>
-        </div>
-      `).join("") || `<div class="card empty">No Hall of Fame entries yet.</div>`}
-    </div>
-  `;
-}
-
-function adminLoginPage() {
-  return `
-    <section class="hero">
-      <div class="hero-card">
-        <div class="hero-logo"><img src="${loadLogoSrc()}" alt="NTFL logo" onerror="this.src='assets/logo.svg'"></div>
-        <div class="hero-copy">
-          <span class="eyebrow">Admin access</span>
-          <h1>Login</h1>
-          <p>Private editing access for NTFL admins.</p>
-          <form class="login-form" onsubmit="NTFL.login(event)">
-            <input class="input" type="text" name="username" placeholder="Username" autocomplete="username" required>
-            <input class="input" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
-            <button class="btn primary" type="submit">Sign in</button>
-          </form>
-        </div>
-      </div>
-    </section>
-  `;
-}
-
-function adminSectionTitle(title, desc) {
-  return `<div class="section-head"><div><h2>${esc(title)}</h2><p class="muted">${esc(desc || "")}</p></div></div>`;
-}
-
-function adminPage() {
-  if (!isAuthed()) return adminLoginPage();
-  const divisions = state.data.divisions || [];
-  const teams = teamsArray();
-  if (!state.ui.adminDivision && divisions[0]) state.ui.adminDivision = divisions[0].slug;
-  if (!state.ui.adminTeam && teams[0]) state.ui.adminTeam = teams[0].slug;
-  if (!state.ui.adminWeek) state.ui.adminWeek = currentWeek();
-  const div = divisionBySlug(state.ui.adminDivision) || divisions[0];
-  const week = Number(state.ui.adminWeek || currentWeek());
-  const games = (state.data.games || []).filter(g => (g.divisionSlug || slugify(g.division)) === (div?.slug || ""));
-  const gameWeeks = [...new Set(games.map(g => Number(g.weekNumber || weekNum(g.week) || 0)).filter(Boolean))].sort((a,b)=>a-b);
-  const weekGames = games.filter(g => Number(g.weekNumber || weekNum(g.week) || 0) === week);
-  const selectedTeam = teamBySlug(state.ui.adminTeam) || teams[0];
-
-  return `
-    <section class="page-head admin-head">
-      <div>
-        <span class="eyebrow">Admin</span>
-        <h1>Dashboard</h1>
-        <p>Update games, scores, live status, rankings, awards, history, and team rundowns.</p>
-      </div>
-      <div class="page-tools">
-        <button class="btn" onclick="NTFL.download()">Download site-data.json</button>
-        <button class="btn" onclick="NTFL.saveBrowser()">Save Draft</button>
-        <button class="btn danger" onclick="NTFL.logout()">Logout</button>
-      </div>
-    </section>
-
-    <div class="grid admin-grid">
-      <div class="admin-col">
-        <div class="card" id="site-editor">
-          ${adminSectionTitle("Site settings", "League name, season, current week, and subtitle.")}
-          <div class="form-grid">
-            <label>League Name<input class="input" name="siteName" value="${esc(state.data.site.name || "")}" oninput="NTFL.siteField('name', this.value)"></label>
-            <label>Season<input class="input" name="siteSeason" value="${esc(state.data.site.season || "")}" oninput="NTFL.siteField('season', this.value)"></label>
-            <label>Current Week<input class="input" type="number" min="1" name="siteWeek" value="${esc(state.data.site.currentWeek || 1)}" oninput="NTFL.siteField('currentWeek', this.value)"></label>
-            <label>Subtitle<input class="input" name="siteSubtitle" value="${esc(state.data.site.subtitle || "")}" oninput="NTFL.siteField('subtitle', this.value)"></label>
-          </div>
-          <div class="row right">
-            <button class="btn primary" onclick="NTFL.saveSite()">Save Site Settings</button>
-          </div>
-        </div>
-
-        <div class="card" id="games-editor">
-          ${adminSectionTitle("Games", "Change scores, status, and time. Final scores update standings and PPG automatically.")}
-          <div class="form-grid compact">
-            <label>Division
-              <select class="select" id="adminDivision" onchange="NTFL.setAdminDivision(this.value)">
-                ${(divisions || []).map(d => `<option value="${esc(d.slug)}" ${div?.slug===d.slug ? "selected" : ""}>${esc(d.name)}</option>`).join("")}
-              </select>
-            </label>
-            <label>Week
-              <select class="select" id="adminWeek" onchange="NTFL.setAdminWeek(this.value)">
-                ${gameWeeks.map(w => `<option value="${w}" ${w===week ? "selected" : ""}>Week ${w}</option>`).join("")}
-              </select>
-            </label>
-          </div>
-          <div id="gamesEditorList" class="grid stacked">
-            ${weekGames.length ? weekGames.map(game => `
-              <div class="card nested game-edit" data-game-id="${esc(game.id)}">
-                <div class="row between">
-                  <div>
-                    <strong>${esc(game.home)} vs ${esc(game.away)}</strong>
-                    <p class="muted">${esc(game.weekLabel || game.week || "")} • ${esc(game.division || "")}</p>
-                  </div>
-                  <span class="pill">${esc(game.id)}</span>
-                </div>
-                <div class="form-grid compact">
-                  <label>Home Score<input class="input" type="number" data-field="homeScore" value="${game.homeScore ?? ""}" onchange="NTFL.gameField('${esc(game.id)}', 'homeScore', this.value)"></label>
-                  <label>Away Score<input class="input" type="number" data-field="awayScore" value="${game.awayScore ?? ""}" onchange="NTFL.gameField('${esc(game.id)}', 'awayScore', this.value)"></label>
-                  <label>Status
-                    <select class="select" data-field="status" onchange="NTFL.gameField('${esc(game.id)}', 'status', this.value)">
-                      <option value="upcoming" ${parseGameStatus(game)==="upcoming" ? "selected" : ""}>Upcoming</option>
-                      <option value="live" ${parseGameStatus(game)==="live" ? "selected" : ""}>Live</option>
-                      <option value="final" ${parseGameStatus(game)==="final" ? "selected" : ""}>Final</option>
-                    </select>
-                  </label>
-                  <label>Time / Note<input class="input" data-field="time" value="${esc(game.time || "")}" oninput="NTFL.gameField('${esc(game.id)}', 'time', this.value)"></label>
-                </div>
-              </div>
-            `).join("") : `<div class="empty card">No games for this division/week.</div>`}
-          </div>
-          <div class="row right">
-            <button class="btn primary" onclick="NTFL.saveGames()">Apply Game Changes</button>
-          </div>
-        </div>
-
-        <div class="card" id="team-editor">
-          ${adminSectionTitle("Team rundown", "Edit coach names and team notes.")}
-          <label>Team
-            <select class="select" id="teamSelect" onchange="NTFL.setAdminTeam(this.value)">
-              ${teams.map(t => `<option value="${t.slug}" ${selectedTeam?.slug===t.slug ? "selected" : ""}>${esc(t.name)}</option>`).join("")}
-            </select>
-          </label>
-          <div class="form-grid">
-            <label>Head Coach<input class="input" name="headCoach" value="${esc(selectedTeam?.headCoach || "")}" oninput="NTFL.teamField('${selectedTeam?.slug}', 'headCoach', this.value)"></label>
-            <label>Assistant Coach<input class="input" name="assistantCoach" value="${esc(selectedTeam?.assistantCoach || "")}" oninput="NTFL.teamField('${selectedTeam?.slug}', 'assistantCoach', this.value)"></label>
-          </div>
-          <label>Notes<textarea class="textarea" name="notes" rows="5" oninput="NTFL.teamField('${selectedTeam?.slug}', 'notes', this.value)">${esc(selectedTeam?.notes || "")}</textarea></label>
-          <div class="row right">
-            <button class="btn primary" onclick="NTFL.saveTeam()">Save Team</button>
-          </div>
-        </div>
-      </div>
-
-      <div class="admin-col">
-        <div class="card" id="rankings-editor">
-          ${adminSectionTitle("Rankings", "Drag and drop to reorder the public rankings list.")}
-          <div class="rank-list" id="rankList">
-            ${(state.data.rankings || []).map((r, idx) => `
-              <div class="rank-item" draggable="true" data-rank-index="${idx}" ondragstart="NTFL.dragRankStart(event, ${idx})" ondragover="NTFL.dragRankOver(event)" ondrop="NTFL.dropRank(event, ${idx})">
-                <div class="drag-handle">☰</div>
-                <div class="rank-meta">
-                  <strong>#${idx + 1} ${esc(r.team)}</strong>
-                  <span>${esc(r.record || "")} • ${esc(r.division || "")}</span>
-                </div>
-                <div class="rank-actions">
-                  <button class="mini-btn" onclick="NTFL.moveRank(${idx}, -1); return false;">↑</button>
-                  <button class="mini-btn" onclick="NTFL.moveRank(${idx}, 1); return false;">↓</button>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <p class="muted tiny">Tip: drag a row or use the arrows. Reorder is saved in the draft immediately.</p>
-        </div>
-
-        <div class="card" id="awards-editor">
-          ${adminSectionTitle("Awards", "Edit league awards and winners.")}
-          <div class="grid stacked">
-            ${(state.data.awards || []).map((a, idx) => `
-              <div class="card nested" data-award-row="${idx}">
-                <div class="form-grid compact">
-                  <label>Category<input class="input" data-field="category" value="${esc(a.category || a.name || "")}" oninput="NTFL.awardField(${idx}, 'category', this.value)"></label>
-                  <label>Winner<input class="input" data-field="winner" value="${esc(a.winner || "")}" oninput="NTFL.awardField(${idx}, 'winner', this.value)"></label>
-                  <label>Team<input class="input" data-field="team" value="${esc(a.team || "")}" oninput="NTFL.awardField(${idx}, 'team', this.value)"></label>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <div class="row between">
-            <button class="btn" onclick="NTFL.addAward()">Add Award Row</button>
-            <button class="btn primary" onclick="NTFL.saveAwards()">Save Awards</button>
-          </div>
-        </div>
-
-        <div class="card" id="history-editor">
-          ${adminSectionTitle("History", "Update season archive entries.")}
-          <div class="grid stacked">
-            ${(state.data.history || []).map((h, idx) => `
-              <div class="card nested" data-history-row="${idx}">
-                <div class="form-grid compact">
-                  <label>Season<input class="input" data-field="season" value="${esc(h.season || "")}" oninput="NTFL.historyField(${idx}, 'season', this.value)"></label>
-                  <label>Champion<input class="input" data-field="champion" value="${esc(h.champion || "")}" oninput="NTFL.historyField(${idx}, 'champion', this.value)"></label>
-                  <label>Record<input class="input" data-field="record" value="${esc(h.record || "")}" oninput="NTFL.historyField(${idx}, 'record', this.value)"></label>
-                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}" oninput="NTFL.historyField(${idx}, 'notes', this.value)"></label>
-                </div>
-              </div>
-            `).join("")}
-          </div>
-          <div class="row between">
-            <button class="btn" onclick="NTFL.addHistory()">Add History Row</button>
-            <button class="btn primary" onclick="NTFL.saveHistory()">Save History</button>
-          </div>
-        </div>
-
-        <div class="card" id="hof-editor">
-          ${adminSectionTitle("Hall of Fame", "Edit special honors and entries.")}
-          <div class="grid stacked">
-            ${(state.data.hallOfFame || []).map((h, idx) => `
-              <div class="card nested" data-hof-row="${idx}">
-                <div class="form-grid compact">
-                  <label>Name<input class="input" data-field="name" value="${esc(h.name || "")}" oninput="NTFL.hofField(${idx}, 'name', this.value)"></label>
-                  <label>Team<input class="input" data-field="team" value="${esc(h.team || "")}" oninput="NTFL.hofField(${idx}, 'team', this.value)"></label>
-                  <label>Honor<input class="input" data-field="honor" value="${esc(h.honor || "")}" oninput="NTFL.hofField(${idx}, 'honor', this.value)"></label>
-                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}" oninput="NTFL.hofField(${idx}, 'notes', this.value)"></label>
-                </div>
-              </div>
-            `).join("") || `<div class="empty card">No Hall of Fame entries yet.</div>`}
-          </div>
-          <div class="row between">
-            <button class="btn" onclick="NTFL.addHOF()">Add Hall of Fame Row</button>
-            <button class="btn primary" onclick="NTFL.saveHOF()">Save Hall of Fame</button>
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-}
-
-function footerHTML() {
-  return `
-    <footer class="footer container">
-      <div>
-        <strong>${esc(state.data.site.name)}</strong>
-        <p>${esc(state.data.site.season)} • Version ${esc(state.data.site.version)} • Last updated ${esc(state.data.site.lastUpdated)}</p>
-      </div>
-      <div class="row tight">
-        <a class="pill" href="#/admin">Admin</a>
-        <a class="pill" href="#/history">History</a>
-        <a class="pill" href="#/awards">Awards</a>
-      </div>
-    </footer>
-  `;
-}
-
-function topbarHTML() {
+function headerHTML() {
   return `
     <header class="topbar">
       <div class="container topbar-inner">
         <a class="brand" href="#/home">
-          <img src="${loadLogoSrc()}" alt="NTFL logo" onerror="this.src='assets/logo.svg'">
+          <img src="${logoSrc()}" alt="NTFL logo" class="brand-logo" onerror="this.src='assets/league-logo.jpeg'">
           <div class="brand-copy">
             <strong>${esc(state.data.site.name)}</strong>
-            <span>${esc(state.data.site.season)}</span>
+            <span>${esc(state.data.site.season)} • Week ${currentWeek()}</span>
           </div>
         </a>
         <nav class="nav">
@@ -1080,7 +760,591 @@ function topbarHTML() {
     </header>
   `;
 }
+function footerHTML() {
+  return `
+    <footer class="footer container">
+      <div>
+        <strong>${esc(state.data.site.name)}</strong>
+        <p>${esc(state.data.site.season)} • Last updated ${esc(lastUpdatedText())}</p>
+      </div>
+      <div class="row tight">
+        <a class="pill" href="#/teams">Teams</a>
+        <a class="pill" href="#/schedule">Schedule</a>
+        <a class="pill" href="#/admin">Admin</a>
+      </div>
+    </footer>
+  `;
+}
 
+function homePage() {
+  const featured = (state.data.games || []).filter(g => Number(g.weekNumber) === currentWeek()).slice(0, 4);
+  const top = (state.data.standings || []).slice(0, 4);
+  const rankTop = (state.data.rankings || []).slice(0, 8);
+  const liveCount = (state.data.games || []).filter(g => gameStatus(g) === "live" && Number(g.weekNumber) === currentWeek()).length;
+  return `
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-main card">
+          <div class="hero-logo-wrap">
+            <img src="${logoSrc()}" alt="League logo" onerror="this.src='assets/league-logo.jpeg'">
+          </div>
+          <div>
+            <div class="eyebrow">${esc(state.data.site.season)} • Week ${currentWeek()}</div>
+            <h1>${esc(state.data.site.name)}</h1>
+            <p>${esc(state.data.site.subtitle)}</p>
+          </div>
+          <div class="hero-actions">
+            <a class="btn primary" href="#/teams">Browse Teams</a>
+            <a class="btn" href="#/schedule">View Schedule</a>
+            <a class="btn" href="#/standings">Standings</a>
+          </div>
+        </div>
+        <div class="hero-side grid stacked">
+          <div class="stat-card"><span>Teams</span><strong>${Object.keys(state.data.teams || {}).length}</strong></div>
+          <div class="stat-card"><span>Live Games</span><strong>${liveCount}</strong></div>
+          <div class="stat-card"><span>Top Team</span><strong>${top[0] ? esc(top[0].team) : "—"}</strong></div>
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-head">
+        <h2>Featured Games</h2>
+        <a href="#/schedule">View all</a>
+      </div>
+      <div class="grid cards-2">
+        ${featured.map(gameCard).join("") || `<div class="card empty">No featured games for this week.</div>`}
+      </div>
+    </section>
+
+    <section class="section-grid two-col">
+      <div>
+        <div class="section-head"><h2>Standings</h2><a href="#/standings">Full table</a></div>
+        ${standingsTable(top, 4)}
+      </div>
+      <div>
+        <div class="section-head"><h2>Power Rankings</h2><a href="#/rankings">Full list</a></div>
+        <div class="grid stacked">
+          ${rankTop.map(r => `
+            <a class="mini-row" href="#/team/${r.slug}">
+              <div class="mini-rank">#${r.rank}</div>
+              <div class="mini-body">
+                <strong>${esc(r.team)}</strong>
+                <span>${esc(r.record)} • ${r.pointDiff >= 0 ? "+" : ""}${r.pointDiff} diff</span>
+              </div>
+            </a>
+          `).join("")}
+        </div>
+      </div>
+    </section>
+
+    <section class="section-grid">
+      <div class="section-head"><h2>Quick Access</h2><a href="#/teams">All teams</a></div>
+      <div class="grid team-grid">
+        ${(teamsArray().slice(0, 8)).map(team => `
+          <a class="team-card" href="#/team/${team.slug}">
+            ${teamMark(team)}
+            <div class="team-meta">
+              <strong>${esc(team.name)}</strong>
+              <span>${esc(team.division)}</span>
+              <small>${formatRecord(team)}</small>
+            </div>
+          </a>
+        `).join("")}
+      </div>
+    </section>
+  `;
+}
+function teamsPage() {
+  const search = state.ui.search.toLowerCase();
+  const teams = teamsArray().filter(t => {
+    const s = `${t.name} ${t.abbr} ${t.division} ${t.headCoach} ${t.assistantCoach}`.toLowerCase();
+    return !search || s.includes(search);
+  });
+  const divisions = [...new Set(teamsArray().map(t => t.division).filter(Boolean))];
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">League</div>
+        <h1>Teams</h1>
+        <p>Every team has a clean page with coaches, schedule, PPG, and notes.</p>
+      </div>
+      <div class="page-tools">
+        <input class="search" type="search" placeholder="Search teams or coaches" value="${esc(state.ui.search)}" oninput="NTFL.searchTeams(this.value)">
+      </div>
+    </section>
+    <div class="chip-row">
+      <button class="chip ${!state.ui.search ? "active" : ""}" onclick="NTFL.searchTeams('')">All</button>
+      ${divisions.map(d => `<button class="chip" onclick="NTFL.searchTeams('${esc(d)}')">${esc(d)}</button>`).join("")}
+    </div>
+    <section class="grid team-grid large">
+      ${teams.map(team => `
+        <a class="team-card large" href="#/team/${team.slug}">
+          ${teamMark(team)}
+          <div class="team-meta">
+            <strong>${esc(team.name)}</strong>
+            <span>${esc(team.division)}</span>
+            <small>${formatRecord(team)} • PPG ${Number(team.ppg).toFixed(1)}</small>
+            <small>${esc(team.headCoach)}${team.assistantCoach ? ` • ${esc(team.assistantCoach)}` : ""}</small>
+          </div>
+        </a>
+      `).join("")}
+    </section>
+  `;
+}
+function teamPage() {
+  const team = getTeam(state.route.slug);
+  if (!team) return `<div class="card empty">Team not found.</div>`;
+  const tab = state.ui.teamTabs[team.slug] || "overview";
+  const content = {
+    overview: `
+      <div class="grid stats-grid">${teamStatCards(team)}</div>
+      <div class="grid two-col">
+        <div class="card">
+          <h3>Season Snapshot</h3>
+          <p class="muted">Final games update record, standings, and PPG automatically.</p>
+          <div class="grid stacked">
+            ${(team.last5 || []).length ? team.last5.map(g => `
+              <div class="mini-row">
+                <div class="mini-rank ${g.scoreFor > g.scoreAgainst ? "good" : g.scoreFor < g.scoreAgainst ? "bad" : ""}">${g.scoreFor > g.scoreAgainst ? "W" : g.scoreFor < g.scoreAgainst ? "L" : "T"}</div>
+                <div class="mini-body">
+                  <strong>${esc(g.weekLabel)} vs ${esc(g.opponent)}</strong>
+                  <span>${g.scoreFor ?? "—"} - ${g.scoreAgainst ?? "—"}</span>
+                </div>
+              </div>
+            `).join("") : `<div class="empty">No completed games yet.</div>`}
+          </div>
+        </div>
+        <div class="card">
+          <h3>Team Rundown</h3>
+          <div class="notes-box">${esc(team.notes || "No notes yet.")}</div>
+        </div>
+      </div>
+    `,
+    schedule: `
+      <div class="grid stacked">
+        ${(team.schedule || []).map(g => `
+          <article class="card schedule-row ${g.status}">
+            <div class="row between">
+              <div class="row tight">
+                <span class="pill">${esc(g.weekLabel)}</span>
+                <span class="pill ${statusPillClass(g.status)}">${esc(statusLabel(g.status))}</span>
+              </div>
+              <span class="muted">${esc(g.note || g.time || "")}</span>
+            </div>
+            <div class="game-line compact">
+              <div class="game-team compact ${g.scoreFor > g.scoreAgainst ? "winner" : ""}">
+                <strong>${g.home ? "vs" : "@"} ${esc(g.opponent)}</strong>
+              </div>
+              <div class="game-score ${g.status}">${esc(scoreText({ ...g, homeScore: g.scoreFor, awayScore: g.scoreAgainst }))}</div>
+              <div class="game-team compact">
+                <strong>${g.home ? "Home" : "Away"}</strong>
+              </div>
+            </div>
+          </article>
+        `).join("") || `<div class="card empty">No schedule available.</div>`}
+      </div>
+    `,
+    ppg: `
+      <div class="grid stats-grid">
+        <div class="stat-card"><span>Offense PPG</span><strong>${Number(team.ppg).toFixed(1)}</strong></div>
+        <div class="stat-card"><span>Defense PPG</span><strong>${Number(team.oppg).toFixed(1)}</strong></div>
+        <div class="stat-card"><span>Point Diff</span><strong>${team.pointDiff >= 0 ? "+" : ""}${team.pointDiff}</strong></div>
+        <div class="stat-card"><span>Games Played</span><strong>${team.gamesPlayed}</strong></div>
+      </div>
+      <div class="card">
+        <h3>PPG Breakdown</h3>
+        <div class="bar-row"><span>Offense</span><div class="bar"><div style="width:${Math.min(100, (team.ppg / 50) * 100)}%"></div></div><strong>${Number(team.ppg).toFixed(1)}</strong></div>
+        <div class="bar-row"><span>Defense</span><div class="bar"><div style="width:${Math.min(100, (team.oppg / 50) * 100)}%"></div></div><strong>${Number(team.oppg).toFixed(1)}</strong></div>
+      </div>
+    `,
+    coaches: `
+      <div class="grid two-col">
+        <div class="card"><h3>Head Coach</h3><p class="coach-tag">${esc(team.headCoach || "TBD")}</p></div>
+        <div class="card"><h3>Assistant Coach</h3><p class="coach-tag">${esc(team.assistantCoach || "TBD")}</p></div>
+      </div>
+    `,
+    notes: `
+      <div class="card">
+        <h3>Notes</h3>
+        <div class="notes-box">${esc(team.notes || "No notes yet.")}</div>
+      </div>
+    `
+  }[tab];
+
+  return `
+    <section class="page-head team-head">
+      <div class="team-hero">
+        ${teamMark(team)}
+        <div>
+          <div class="eyebrow">${esc(team.division)}</div>
+          <h1>${esc(team.name)}</h1>
+          <p>${esc(team.headCoach || "TBD")}${team.assistantCoach ? ` • ${esc(team.assistantCoach)}` : ""}</p>
+        </div>
+      </div>
+      <div class="page-tools">
+        <span class="pill">${formatRecord(team)}</span>
+        <span class="pill">PPG ${Number(team.ppg).toFixed(1)}</span>
+      </div>
+    </section>
+
+    <div class="tabs">
+      ${["overview","schedule","ppg","coaches","notes"].map(t => `<button class="tab ${tab===t?"active":""}" onclick="NTFL.setTeamTab('${team.slug}','${t}')">${t}</button>`).join("")}
+    </div>
+
+    <section class="section-grid">${content}</section>
+  `;
+}
+function schedulePage() {
+  const weeks = [...new Set((state.data.games || []).map(g => Number(g.weekNumber || 0)).filter(Boolean))].sort((a, b) => a - b);
+  const week = state.ui.adminWeek || currentWeek();
+  const divisionFilter = state.ui.statusFilter === "all" ? "" : state.ui.statusFilter;
+  const games = (state.data.games || [])
+    .filter(g => Number(g.weekNumber || 0) === week)
+    .filter(g => !divisionFilter || g.status === divisionFilter || divisionFilter === "all")
+    .sort((a, b) => (a.division || "").localeCompare(b.division || "") || (a.home || "").localeCompare(b.home || ""));
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">League</div>
+        <h1>Schedule</h1>
+        <p>A clean schedule board with clear status, scores, and team badges.</p>
+      </div>
+      <div class="page-tools">
+        <select class="select" onchange="NTFL.setAdminWeek(this.value)">
+          ${weeks.map(w => `<option value="${w}" ${w===week ? "selected" : ""}>Week ${w}</option>`).join("")}
+        </select>
+      </div>
+    </section>
+    <div class="chip-row">
+      <button class="chip ${state.ui.statusFilter==="all" ? "active" : ""}" onclick="NTFL.setStatusFilter('all')">All</button>
+      <button class="chip ${state.ui.statusFilter==="final" ? "active" : ""}" onclick="NTFL.setStatusFilter('final')">Final</button>
+      <button class="chip ${state.ui.statusFilter==="live" ? "active" : ""}" onclick="NTFL.setStatusFilter('live')">Live</button>
+      <button class="chip ${state.ui.statusFilter==="upcoming" ? "active" : ""}" onclick="NTFL.setStatusFilter('upcoming')">Upcoming</button>
+    </div>
+    <div class="grid stacked">
+      ${games.map(gameCard).join("") || `<div class="card empty">Schedule not found.</div>`}
+    </div>
+  `;
+}
+function standingsPage() {
+  const rows = state.data.standings || [];
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">League</div>
+        <h1>Standings</h1>
+        <p>Recalculated automatically from final scores.</p>
+      </div>
+    </section>
+    ${standingsTable(rows, rows.length)}
+  `;
+}
+function rankingsPage() {
+  const rows = state.data.rankings || [];
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">League</div>
+        <h1>Rankings</h1>
+        <p>Drag and drop in Admin to reorder the public rankings list.</p>
+      </div>
+    </section>
+    <div class="grid stacked">
+      ${rows.map(r => `
+        <a class="mini-row ranking-row" href="#/team/${r.slug}">
+          <div class="mini-rank">#${r.rank}</div>
+          <div class="mini-body">
+            <strong>${esc(r.team)}</strong>
+            <span>${esc(r.record)} • ${esc(r.division)} • ${r.pointDiff >= 0 ? "+" : ""}${r.pointDiff} diff</span>
+          </div>
+        </a>
+      `).join("")}
+    </div>
+  `;
+}
+function awardsPage() {
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">Archive</div>
+        <h1>Awards</h1>
+        <p>Editable league honors and winners.</p>
+      </div>
+    </section>
+    <div class="grid cols-2">
+      ${(state.data.awards || []).map(a => `
+        <div class="card">
+          <h3>${esc(a.category || "Award")}</h3>
+          <p class="award-winner">${esc(a.winner || "TBD")}</p>
+          <p class="muted">${esc(a.team || "TBD")}</p>
+        </div>
+      `).join("") || `<div class="card empty">No awards added yet.</div>`}
+    </div>
+  `;
+}
+function historyPage() {
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">Archive</div>
+        <h1>History</h1>
+        <p>Season archive and past notes.</p>
+      </div>
+    </section>
+    <div class="grid stacked">
+      ${(state.data.history || []).map(h => `
+        <div class="card">
+          <div class="row between">
+            <h3>${esc(h.season || "Season")}</h3>
+            <span class="pill">${esc(h.record || "TBD")}</span>
+          </div>
+          <p><strong>Champion:</strong> ${esc(h.champion || "TBD")}</p>
+          <p class="muted">${esc(h.notes || "")}</p>
+        </div>
+      `).join("")}
+    </div>
+  `;
+}
+function hofPage() {
+  return `
+    <section class="page-head">
+      <div>
+        <div class="eyebrow">Archive</div>
+        <h1>Hall of Fame</h1>
+        <p>Special honors and league legends.</p>
+      </div>
+    </section>
+    <div class="grid cols-2">
+      ${(state.data.hallOfFame || []).map(h => `
+        <div class="card">
+          <h3>${esc(h.name || "Honoree")}</h3>
+          <p>${esc(h.team || "")}</p>
+          <p class="muted">${esc(h.honor || "")}${h.notes ? ` • ${esc(h.notes)}` : ""}</p>
+        </div>
+      `).join("") || `<div class="card empty">No Hall of Fame entries yet.</div>`}
+    </div>
+  `;
+}
+function adminLoginPage() {
+  return `
+    <section class="hero">
+      <div class="hero-grid">
+        <div class="hero-main card">
+          <div class="hero-logo-wrap">
+            <img src="${logoSrc()}" alt="NTFL logo" onerror="this.src='assets/league-logo.jpeg'">
+          </div>
+          <div>
+            <div class="eyebrow">Admin access</div>
+            <h1>Login</h1>
+            <p>Private editing access for NTFL admins.</p>
+          </div>
+          <form class="login-form" onsubmit="NTFL.login(event)">
+            <input class="input" type="text" name="username" placeholder="Username" autocomplete="username" required>
+            <input class="input" type="password" name="password" placeholder="Password" autocomplete="current-password" required>
+            <button class="btn primary" type="submit">Sign in</button>
+          </form>
+        </div>
+        <div class="hero-side">
+          <div class="card">
+            <h3>Public publishing</h3>
+            <p class="muted">Connect a shared backend once, then every publish updates the live site for everyone.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+  `;
+}
+function adminPage() {
+  if (!isAuthed()) return adminLoginPage();
+  const divisions = [...new Set(teamsArray().map(t => t.division).filter(Boolean))];
+  const teams = teamsArray();
+  if (!state.ui.adminDivision && divisions[0]) state.ui.adminDivision = divisions[0];
+  if (!state.ui.adminTeam && teams[0]) state.ui.adminTeam = teams[0].slug;
+  if (!state.ui.adminWeek) state.ui.adminWeek = currentWeek();
+  const division = state.ui.adminDivision || divisions[0];
+  const week = Number(state.ui.adminWeek || currentWeek());
+  const divisionGames = (state.data.games || []).filter(g => g.division === division);
+  const weeks = [...new Set(divisionGames.map(g => Number(g.weekNumber || 0)).filter(Boolean))].sort((a, b) => a - b);
+  const weekGames = divisionGames.filter(g => Number(g.weekNumber || 0) === week);
+  const selectedTeam = getTeam(state.ui.adminTeam) || teams[0];
+
+  return `
+    <section class="page-head admin-head">
+      <div>
+        <div class="eyebrow">Admin</div>
+        <h1>Dashboard</h1>
+        <p>Update the entire site from one place and publish it publicly when ready.</p>
+      </div>
+      <div class="page-tools">
+        <button class="btn" onclick="NTFL.download()">Download site-data.json</button>
+        <button class="btn" onclick="NTFL.saveAllDraft()">Save Draft</button>
+        <button class="btn primary" onclick="NTFL.publishPublic()">Publish Public</button>
+        <button class="btn danger" onclick="NTFL.logout()">Logout</button>
+      </div>
+    </section>
+
+    <div class="admin-grid">
+      <div class="admin-col">
+        <div class="card" id="site-editor">
+          <div class="section-head"><div><h2>Site settings</h2><p class="muted">League name, season, current week, and backend connection.</p></div></div>
+          <div class="form-grid">
+            <label>League Name<input class="input" name="siteName" value="${esc(state.data.site.name)}"></label>
+            <label>Season<input class="input" name="siteSeason" value="${esc(state.data.site.season)}"></label>
+            <label>Current Week<input class="input" type="number" min="1" name="siteWeek" value="${esc(state.data.site.currentWeek)}"></label>
+            <label>Subtitle<input class="input" name="siteSubtitle" value="${esc(state.data.site.subtitle)}"></label>
+            <label><input type="checkbox" name="backendEnabled" ${backendReady() ? "checked" : ""}> Enable public backend publishing</label>
+            <label>Backend URL<input class="input" name="backendUrl" value="${esc(state.data.site.backend.url || "")}" placeholder="https://xxxxx.supabase.co"></label>
+            <label>Anon Key<input class="input" name="backendKey" value="${esc(state.data.site.backend.anonKey || "")}" placeholder="Supabase anon key"></label>
+            <label>Table<input class="input" name="backendTable" value="${esc(state.data.site.backend.table || "site_state")}"></label>
+            <label>Row ID<input class="input" name="backendRowId" value="${esc(state.data.site.backend.rowId || "ntfl")}"></label>
+          </div>
+          <div class="row right">
+            <button class="btn primary" onclick="NTFL.saveSite()">Save Site Settings</button>
+          </div>
+        </div>
+
+        <div class="card" id="games-editor">
+          <div class="section-head"><div><h2>Games</h2><p class="muted">Change scores, time notes, and status. Finals update standings and PPG automatically.</p></div></div>
+          <div class="form-grid compact">
+            <label>Division
+              <select class="select" onchange="NTFL.setAdminDivision(this.value)">
+                ${(divisions || []).map(d => `<option value="${esc(d)}" ${division===d ? "selected" : ""}>${esc(d)}</option>`).join("")}
+              </select>
+            </label>
+            <label>Week
+              <select class="select" onchange="NTFL.setAdminWeek(this.value)">
+                ${weeks.map(w => `<option value="${w}" ${w===week ? "selected" : ""}>Week ${w}</option>`).join("")}
+              </select>
+            </label>
+          </div>
+          <div class="grid stacked">
+            ${weekGames.map(game => `
+              <div class="card nested game-edit" data-game-id="${esc(game.id)}">
+                <div class="row between">
+                  <strong>${esc(game.home)} vs ${esc(game.away)}</strong>
+                  <span class="pill">${esc(game.id)}</span>
+                </div>
+                <div class="form-grid compact">
+                  <label>Home Score<input class="input" type="number" data-field="homeScore" value="${game.homeScore ?? ""}"></label>
+                  <label>Away Score<input class="input" type="number" data-field="awayScore" value="${game.awayScore ?? ""}"></label>
+                  <label>Status
+                    <select class="select" data-field="status">
+                      <option value="upcoming" ${game.status === "upcoming" ? "selected" : ""}>Upcoming</option>
+                      <option value="live" ${game.status === "live" ? "selected" : ""}>Live</option>
+                      <option value="final" ${game.status === "final" ? "selected" : ""}>Final</option>
+                    </select>
+                  </label>
+                  <label>Time / Note<input class="input" data-field="time" value="${esc(game.time || "")}"></label>
+                  <label>Note<input class="input" data-field="note" value="${esc(game.note || "")}"></label>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="row right"><button class="btn primary" onclick="NTFL.saveGames()">Apply Game Changes</button></div>
+        </div>
+
+        <div class="card" id="team-editor">
+          <div class="section-head"><div><h2>Team rundown</h2><p class="muted">Edit coach names, colors, abbreviation, and notes.</p></div></div>
+          <label>Team
+            <select class="select" onchange="NTFL.setAdminTeam(this.value)">
+              ${teams.map(t => `<option value="${t.slug}" ${selectedTeam?.slug===t.slug ? "selected" : ""}>${esc(t.name)}</option>`).join("")}
+            </select>
+          </label>
+          <div class="form-grid">
+            <label>Abbreviation<input class="input" name="abbr" value="${esc(selectedTeam?.abbr || "")}"></label>
+            <label>Primary Color<input class="input" name="primaryColor" value="${esc(selectedTeam?.primaryColor || "")}"></label>
+            <label>Secondary Color<input class="input" name="secondaryColor" value="${esc(selectedTeam?.secondaryColor || "")}"></label>
+            <label>Head Coach<input class="input" name="headCoach" value="${esc(selectedTeam?.headCoach || "")}"></label>
+            <label>Assistant Coach<input class="input" name="assistantCoach" value="${esc(selectedTeam?.assistantCoach || "")}"></label>
+          </div>
+          <label>Notes<textarea class="textarea" name="notes" rows="6">${esc(selectedTeam?.notes || "")}</textarea></label>
+          <div class="row right"><button class="btn primary" onclick="NTFL.saveTeam()">Save Team</button></div>
+        </div>
+      </div>
+
+      <div class="admin-col">
+        <div class="card">
+          <div class="section-head"><div><h2>Rankings</h2><p class="muted">Drag and drop to reorder the public list.</p></div></div>
+          <div class="rank-list" id="rankList">
+            ${state.data.rankings.map((r, idx) => `
+              <div class="rank-item" draggable="true" data-rank-index="${idx}" ondragstart="NTFL.dragRankStart(event, ${idx})" ondragover="NTFL.dragRankOver(event)" ondrop="NTFL.dropRank(event, ${idx})">
+                <div class="drag-handle">☰</div>
+                <div class="rank-meta">
+                  <strong>#${idx + 1} ${esc(r.team)}</strong>
+                  <span>${esc(r.record)} • ${esc(r.division)} • ${r.pointDiff >= 0 ? "+" : ""}${r.pointDiff} diff</span>
+                </div>
+                <div class="rank-actions">
+                  <button class="mini-btn" onclick="NTFL.moveRank(${idx}, -1); return false;">↑</button>
+                  <button class="mini-btn" onclick="NTFL.moveRank(${idx}, 1); return false;">↓</button>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+        </div>
+
+        <div class="card" id="awards-editor">
+          <div class="section-head"><div><h2>Awards</h2><p class="muted">Edit league honors.</p></div></div>
+          <div class="grid stacked">
+            ${state.data.awards.map((a, idx) => `
+              <div class="card nested" data-award-row="${idx}">
+                <div class="form-grid compact">
+                  <label>Category<input class="input" data-field="category" value="${esc(a.category || "")}"></label>
+                  <label>Winner<input class="input" data-field="winner" value="${esc(a.winner || "")}"></label>
+                  <label>Team<input class="input" data-field="team" value="${esc(a.team || "")}"></label>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="row between">
+            <button class="btn" onclick="NTFL.addAward()">Add Award Row</button>
+            <button class="btn primary" onclick="NTFL.saveAwards()">Save Awards</button>
+          </div>
+        </div>
+
+        <div class="card" id="history-editor">
+          <div class="section-head"><div><h2>History</h2><p class="muted">Past champions and league archive.</p></div></div>
+          <div class="grid stacked">
+            ${state.data.history.map((h, idx) => `
+              <div class="card nested" data-history-row="${idx}">
+                <div class="form-grid compact">
+                  <label>Season<input class="input" data-field="season" value="${esc(h.season || "")}"></label>
+                  <label>Champion<input class="input" data-field="champion" value="${esc(h.champion || "")}"></label>
+                  <label>Record<input class="input" data-field="record" value="${esc(h.record || "")}"></label>
+                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}"></label>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="row between">
+            <button class="btn" onclick="NTFL.addHistory()">Add History Row</button>
+            <button class="btn primary" onclick="NTFL.saveHistory()">Save History</button>
+          </div>
+        </div>
+
+        <div class="card" id="hof-editor">
+          <div class="section-head"><div><h2>Hall of Fame</h2><p class="muted">Special honors.</p></div></div>
+          <div class="grid stacked">
+            ${state.data.hallOfFame.map((h, idx) => `
+              <div class="card nested" data-hof-row="${idx}">
+                <div class="form-grid compact">
+                  <label>Name<input class="input" data-field="name" value="${esc(h.name || "")}"></label>
+                  <label>Team<input class="input" data-field="team" value="${esc(h.team || "")}"></label>
+                  <label>Honor<input class="input" data-field="honor" value="${esc(h.honor || "")}"></label>
+                  <label>Notes<input class="input" data-field="notes" value="${esc(h.notes || "")}"></label>
+                </div>
+              </div>
+            `).join("")}
+          </div>
+          <div class="row between">
+            <button class="btn" onclick="NTFL.addHOF()">Add HOF Row</button>
+            <button class="btn primary" onclick="NTFL.saveHOF()">Save HOF</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  `;
+}
 function render() {
   state.route = routeFromHash();
   let body = "";
@@ -1098,308 +1362,51 @@ function render() {
     case "admin": body = adminPage(); break;
     default: body = `<div class="card empty">Page not found.</div>`;
   }
-  document.title = `${state.data.site.name} • ${state.route.page[0].toUpperCase() + state.route.page.slice(1)}`;
   app.innerHTML = `
     <div class="shell">
-      ${topbarHTML()}
-      <main class="container main-content">
-        ${body}
-      </main>
+      ${headerHTML()}
+      <main class="container main-content">${body}</main>
       ${footerHTML()}
     </div>
   `;
-}
-
-function persistAndRender() {
-  rebuildDerived(state.data);
-  saveDraft(state.data);
-  render();
-}
-
-function updateSiteFromInputs() {
-  const card = document.getElementById("site-editor");
-  if (!card) return;
-  const inputs = card.querySelectorAll("input");
-  const map = Object.fromEntries([...inputs].map(i => [i.name, i.value]));
-  state.data.site.name = map.siteName || state.data.site.name;
-  state.data.site.season = map.siteSeason || state.data.site.season;
-  state.data.site.currentWeek = Number(map.siteWeek || state.data.site.currentWeek || 1);
-  state.data.site.subtitle = map.siteSubtitle || state.data.site.subtitle;
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-}
-function saveSite() {
-  updateSiteFromInputs();
-  persistAndRender();
-}
-function saveGames() {
-  const card = document.getElementById("games-editor");
-  if (!card) return;
-  const rows = card.querySelectorAll(".game-edit");
-  rows.forEach(row => {
-    const id = row.dataset.gameId;
-    const game = state.data.games.find(g => g.id === id);
-    if (!game) return;
-    const get = field => row.querySelector(`[data-field="${field}"]`)?.value ?? "";
-    const hs = get("homeScore");
-    const as = get("awayScore");
-    game.homeScore = hs === "" ? null : Number(hs);
-    game.awayScore = as === "" ? null : Number(as);
-    game.status = get("status") || "upcoming";
-    game.time = get("time");
-    game.played = game.status === "final";
-  });
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  persistAndRender();
-}
-function saveTeam() {
-  const card = document.getElementById("team-editor");
-  if (!card) return;
-  const slug = state.ui.adminTeam;
-  const team = teamBySlug(slug);
-  if (!team) return;
-  team.headCoach = card.querySelector('[name="headCoach"]')?.value || "TBD";
-  team.assistantCoach = card.querySelector('[name="assistantCoach"]')?.value || "TBD";
-  team.notes = card.querySelector('[name="notes"]')?.value || "";
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  persistAndRender();
-}
-function saveAwards() {
-  const rows = document.querySelectorAll("#awards-editor [data-award-row]");
-  state.data.awards = [...rows].map(row => ({
-    category: row.querySelector('[data-field="category"]')?.value || "",
-    winner: row.querySelector('[data-field="winner"]')?.value || "",
-    team: row.querySelector('[data-field="team"]')?.value || ""
-  }));
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  persistAndRender();
-}
-function saveHistory() {
-  const rows = document.querySelectorAll("#history-editor [data-history-row]");
-  state.data.history = [...rows].map(row => ({
-    season: row.querySelector('[data-field="season"]')?.value || "",
-    champion: row.querySelector('[data-field="champion"]')?.value || "",
-    record: row.querySelector('[data-field="record"]')?.value || "",
-    notes: row.querySelector('[data-field="notes"]')?.value || ""
-  }));
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  persistAndRender();
-}
-function saveHOF() {
-  const rows = document.querySelectorAll("#hof-editor [data-hof-row]");
-  state.data.hallOfFame = [...rows].map(row => ({
-    name: row.querySelector('[data-field="name"]')?.value || "",
-    team: row.querySelector('[data-field="team"]')?.value || "",
-    honor: row.querySelector('[data-field="honor"]')?.value || "",
-    notes: row.querySelector('[data-field="notes"]')?.value || ""
-  }));
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  persistAndRender();
-}
-function addAward() {
-  state.data.awards.push({ category: "", winner: "", team: "" });
-  saveDraft(state.data);
-  render();
-}
-function addHistory() {
-  state.data.history.push({ season: "", champion: "", record: "", notes: "" });
-  saveDraft(state.data);
-  render();
-}
-function addHOF() {
-  state.data.hallOfFame.push({ name: "", team: "", honor: "", notes: "" });
-  saveDraft(state.data);
-  render();
-}
-function setAdminDivision(value) {
-  state.ui.adminDivision = value;
-  state.ui.search = "";
-  render();
-}
-function setAdminWeek(value) {
-  state.ui.adminWeek = Number(value);
-  render();
-}
-function setAdminTeam(value) {
-  state.ui.adminTeam = value;
-  render();
-}
-function searchTeams(value) {
-  state.ui.search = value;
-  render();
-}
-function login(event) {
-  event.preventDefault();
-  const form = event.target;
-  const user = form.username?.value?.trim();
-  const pass = form.password?.value?.trim();
-  if (user === DEMO_USER && pass === DEMO_PASS) {
-    setAuthed(true);
-    render();
-    return;
-  }
-  alert("Login failed.");
-}
-function logout() {
-  setAuthed(false);
-  render();
-}
-function saveBrowser() {
-  saveDraft(state.data);
-  alert("Draft saved in this browser.");
-}
-function download() {
-  const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
-  const link = document.createElement("a");
-  link.href = URL.createObjectURL(blob);
-  link.download = "site-data.json";
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-  setTimeout(() => URL.revokeObjectURL(link.href), 1000);
-}
-function dragRankStart(event, idx) {
-  state.ui.adminRankDrag = idx;
-  event.dataTransfer.effectAllowed = "move";
-  event.dataTransfer.setData("text/plain", String(idx));
-}
-function dragRankOver(event) {
-  event.preventDefault();
-  event.dataTransfer.dropEffect = "move";
-}
-function dropRank(event, idx) {
-  event.preventDefault();
-  const from = Number(event.dataTransfer.getData("text/plain") || state.ui.adminRankDrag);
-  if (!Number.isFinite(from) || from === idx) return;
-  moveRankInternal(from, idx);
-}
-function moveRank(idx, dir) {
-  const to = idx + dir;
-  if (to < 0 || to >= state.data.rankings.length) return;
-  moveRankInternal(idx, to);
-}
-function moveRankInternal(from, to) {
-  const list = [...state.data.rankings];
-  const [item] = list.splice(from, 1);
-  list.splice(to, 0, item);
-  state.data.rankings = list;
-  state.data.rankings = state.data.rankings.map((r, idx) => ({ ...r, rank: idx + 1 }));
-  saveDraft(state.data);
-  render();
-}
-
-
-function siteField(field, value) {
-  if (!state.data?.site) return;
-  state.data.site[field] = field === "currentWeek" ? Number(value || 1) : value;
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  saveDraft(state.data);
-}
-
-function gameField(gameId, field, value) {
-  const game = state.data?.games?.find(g => g.id === gameId);
-  if (!game) return;
-  if (field === "homeScore" || field === "awayScore") {
-    game[field] = value === "" ? null : Number(value);
-  } else {
-    game[field] = value;
-  }
-  if (field === "status" && value !== "final") {
-    game.played = false;
-  } else if (field === "status" && value === "final") {
-    game.played = true;
-  }
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  rebuildDerived(state.data);
-  saveDraft(state.data);
-}
-
-function teamField(slug, field, value) {
-  const team = teamBySlug(slug);
-  if (!team) return;
-  team[field] = value;
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  saveDraft(state.data);
-}
-
-function awardField(index, field, value) {
-  const item = state.data?.awards?.[index];
-  if (!item) return;
-  item[field] = value;
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  saveDraft(state.data);
-}
-
-function historyField(index, field, value) {
-  const item = state.data?.history?.[index];
-  if (!item) return;
-  item[field] = value;
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  saveDraft(state.data);
-}
-
-function hofField(index, field, value) {
-  const item = state.data?.hallOfFame?.[index];
-  if (!item) return;
-  item[field] = value;
-  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
-  saveDraft(state.data);
-}
-
-function syncDraftAndRender() {
-  rebuildDerived(state.data);
-  saveDraft(state.data);
-  render();
+  document.title = `${state.data.site.name} • ${state.route.page[0].toUpperCase() + state.route.page.slice(1)}`;
 }
 
 window.NTFL = {
-  searchTeams,
   setTeamTab,
+  searchTeams: setSearch,
+  setAdminWeek,
+  setAdminDivision,
+  setAdminTeam,
+  setStatusFilter,
   login,
   logout,
-  saveBrowser,
-  download,
   saveSite,
   saveGames,
   saveTeam,
   saveAwards,
   saveHistory,
   saveHOF,
+  saveAllDraft,
+  download: downloadJSON,
+  publishPublic,
   addAward,
   addHistory,
   addHOF,
-  setAdminDivision,
-  setAdminWeek,
-  setAdminTeam,
+  moveRank,
   dragRankStart,
   dragRankOver,
-  dropRank,
-  moveRank,
-  siteField,
-  gameField,
-  teamField,
-  awardField,
-  historyField,
-  hofField
+  dropRank
 };
 
-(async function init() {
-  try {
-    state.data = await loadData();
-    if (!state.route.page) state.route = routeFromHash();
-    if (!location.hash) location.hash = "#/home";
-    render();
-  } catch (err) {
-    app.innerHTML = `<div class="container"><div class="card empty">Could not load NTFL data.</div></div>`;
-    console.error(err);
-  }
-})();
-
 window.addEventListener("hashchange", render);
-window.addEventListener("storage", e => {
-  if (e.key === STORAGE_KEY) {
-    try {
-      state.data = normalizeData(JSON.parse(e.newValue));
-      render();
-    } catch {}
-  }
-});
+
+(async function init() {
+  state.data = await loadData();
+  state.ui.adminWeek = currentWeek();
+  state.ui.adminDivision = teamsArray()[0]?.division || "";
+  state.ui.adminTeam = teamsArray()[0]?.slug || "";
+  state.ui.week = currentWeek();
+  if (!location.hash) location.hash = "#/home";
+  render();
+})();
