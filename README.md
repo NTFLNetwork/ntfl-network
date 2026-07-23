@@ -1,15 +1,51 @@
-# NTFL Public Build
+# NTFL Public Rebuild
 
-This ZIP is set up for a GitHub Pages-style public site.
+This site is built to be a clean public league hub with:
+- team pages
+- standings
+- rankings
+- awards
+- history
+- Hall of Fame
+- admin editing
+- public publishing support
 
-## Public update workflow
-1. Open the Admin page on the site.
-2. Edit scores, team notes, coaches, awards, history, hall of fame, and rankings.
-3. Download `site-data.json` from Admin.
-4. Replace `data/site-data.json` in your GitHub repo with the downloaded file.
-5. Commit the change.
+## Public publish workflow
 
-When GitHub Pages refreshes, everyone sees the update on the public site.
+The site can publish to a shared Supabase table so everyone sees updates on refresh.
 
-## Important
-This build is a static site package. If you want edits to appear instantly to everyone without replacing a file in GitHub, you need a backend database or API.
+### Table setup
+Create a table like this:
+
+- `site_state`
+- columns:
+  - `id` text primary key
+  - `payload` jsonb not null
+  - `updated_at` timestamptz default now()
+
+Insert one row with:
+- `id = ntfl`
+
+### In the Admin panel
+Open **Admin** and fill in:
+- Backend URL
+- Anon key
+- Table name
+- Row ID
+
+Then:
+1. Edit the site
+2. Click **Publish Public**
+
+That saves the current data into the shared row, and the public site reads from that same row.
+
+### Fallback
+If the backend is not connected yet, use:
+- **Download site-data.json**
+- upload it to `data/site-data.json`
+- commit the change in GitHub
+
+## Notes
+- Team badges use uppercase abbreviations.
+- Team colors are built into the site data.
+- The page is mobile-friendly and designed for public sharing.
