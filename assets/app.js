@@ -1,7 +1,7 @@
 
 const STORAGE_KEY = "ntfl-site-draft";
 const AUTH_KEY = "ntfl-admin-auth";
-const DATA_URL = "data/site-data.json";
+const DATA_URL = "data/site-data.json?v=" + Date.now();
 const DEMO_USER = "demo";
 const DEMO_PASS = "demo123";
 
