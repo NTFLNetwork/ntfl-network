@@ -4,7 +4,7 @@
     "season": "Season 3",
     "currentWeek": 3,
     "subtitle": "Modern editable league hub",
-    "version": "modern-fix-2",
+    "version": "modern-fix-3",
     "lastUpdated": "2026-07-23"
   },
   "divisions": [
@@ -85,11 +85,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 39,
-              "scoreAgainst": 10,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": "MNF",
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Dolphins",
@@ -98,11 +98,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 33,
-              "scoreAgainst": 31,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Patriots",
@@ -111,11 +111,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 10,
-              "scoreAgainst": 39,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": "MNF",
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Jets",
@@ -124,11 +124,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 31,
-              "scoreAgainst": 33,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             }
           ]
         },
@@ -1103,11 +1103,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 30,
-              "scoreAgainst": 36,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Bengals",
@@ -1116,11 +1116,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 35,
-              "scoreAgainst": 105,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Browns",
@@ -1129,11 +1129,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 36,
-              "scoreAgainst": 30,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Steelers",
@@ -1142,8 +1142,8 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 105,
-              "scoreAgainst": 35,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
               "status": "upcoming"
@@ -2121,11 +2121,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 38,
-              "scoreAgainst": 11,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": "TNF",
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Colts",
@@ -2134,11 +2134,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 8,
-              "scoreAgainst": 35,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Jaguars",
@@ -2147,11 +2147,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 11,
-              "scoreAgainst": 38,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": "TNF",
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Titans",
@@ -2160,11 +2160,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 35,
-              "scoreAgainst": 8,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             }
           ]
         },
@@ -3139,11 +3139,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 47,
-              "scoreAgainst": 62,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Chargers",
@@ -3152,11 +3152,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 62,
-              "scoreAgainst": 47,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Broncos",
@@ -3165,11 +3165,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 39,
-              "scoreAgainst": 25,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Raiders",
@@ -3178,11 +3178,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 25,
-              "scoreAgainst": 39,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             }
           ]
         },
@@ -5175,11 +5175,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 29,
-              "scoreAgainst": 8,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": "SNF",
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Packers",
@@ -5188,11 +5188,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 10,
-              "scoreAgainst": 23,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Vikings",
@@ -5201,11 +5201,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 23,
-              "scoreAgainst": 10,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Bears",
@@ -5214,11 +5214,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 8,
-              "scoreAgainst": 29,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": "SNF",
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             }
           ]
         },
@@ -6193,11 +6193,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 38,
-              "scoreAgainst": 45,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Falcons",
@@ -6206,11 +6206,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 17,
-              "scoreAgainst": 18,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Saints",
@@ -6219,11 +6219,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 45,
-              "scoreAgainst": 38,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Panthers",
@@ -6232,11 +6232,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 18,
-              "scoreAgainst": 17,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             }
           ]
         },
@@ -7211,11 +7211,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 11,
-              "scoreAgainst": 18,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Seahawks",
@@ -7224,11 +7224,11 @@
               "home": true,
               "away": false,
               "played": false,
-              "scoreFor": 53,
-              "scoreAgainst": 21,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Rams",
@@ -7237,11 +7237,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 18,
-              "scoreAgainst": 11,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             },
             {
               "team": "Cardinals",
@@ -7250,11 +7250,11 @@
               "home": false,
               "away": true,
               "played": false,
-              "scoreFor": 21,
-              "scoreAgainst": 53,
+              "scoreFor": null,
+              "scoreAgainst": null,
               "weekDetail": null,
               "bye": false,
-              "status": "final"
+              "status": "upcoming"
             }
           ]
         },
@@ -8161,8 +8161,8 @@
       "headCoach": "@iancmcclintock",
       "assistantCoach": "@Valen59DaGoat",
       "notes": "Add a short team rundown here from the admin dashboard.",
-      "gamesPlayed": 2,
-      "wins": 2,
+      "gamesPlayed": 1,
+      "wins": 1,
       "losses": 0,
       "ties": 0,
       "pointsFor": 85,
