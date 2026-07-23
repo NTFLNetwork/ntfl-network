@@ -96,3 +96,9 @@ tr.current td{background:rgba(59,130,246,.11)}
   table{font-size:14px}
   .hide-mobile{display:none}
 }
+
+
+#view input:not(.search), #view select, #view textarea { width:100%; background:#081120; color:var(--text); border:1px solid var(--line); border-radius:14px; padding:12px 14px; }
+#view textarea { min-height: 120px; resize: vertical; line-height: 1.5; }
+#view select { appearance: none; }
+#view label { display:block; margin-bottom:6px; }
