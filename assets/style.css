@@ -180,3 +180,10 @@ small,span{word-break:break-word}
   .game-score{text-align:left}
   h1{font-size:2.2rem}
 }
+
+.cols-2{grid-template-columns:repeat(2,minmax(0,1fr))}
+.mini-row{display:flex;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);background:rgba(255,255,255,.035)}
+.mini-rank{width:52px;height:52px;border-radius:18px;display:grid;place-items:center;background:rgba(79,140,255,.14);font-weight:900}
+.mini-body{display:flex;flex-direction:column;gap:4px}
+.rank-meta{display:flex;flex-direction:column;gap:4px}
+.rank-meta span{color:var(--muted);font-size:.9rem}
