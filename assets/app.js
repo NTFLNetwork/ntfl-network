@@ -4,6 +4,7 @@ const AUTH_KEY = "ntfl-admin-auth";
 const DATA_URL = "data/site-data.json";
 const DEMO_USER = "demo";
 const DEMO_PASS = "demo123";
+const APP_VERSION = "paragon-modern-1";
 
 const state = {
   data: null,
@@ -242,10 +243,15 @@ function formatRecord(t) {
 function hero(kicker, title, subtitle) {
   return `
     <section class="hero">
-      <div class="hero-card">
-        <span class="kicker">${esc(kicker)}</span>
-        <h1 class="title">${esc(title)}</h1>
-        <div class="subtitle">${subtitle}</div>
+      <div class="hero-card hero-grid">
+        <div class="hero-mark" aria-hidden="true">
+          <img src="assets/IMG_5900.png" alt="">
+        </div>
+        <div class="hero-copy">
+          <span class="kicker">${esc(kicker)}</span>
+          <h1 class="title">${esc(title)}</h1>
+          <div class="subtitle">${subtitle}</div>
+        </div>
       </div>
     </section>
   `;
@@ -254,7 +260,7 @@ function hero(kicker, title, subtitle) {
 function navHtml() {
   return `
     <div class="dropdown" id="menuDropdown">
-      <button type="button" id="menuButton">Menu ▾</button>
+      <button type="button" id="menuButton">League Menu ▾</button>
       <div class="dropdown-panel">
         <div class="menu-section">
           <div class="menu-heading">League</div>
@@ -300,7 +306,10 @@ function shellHtml() {
       <main class="container" id="view"></main>
       <div class="container footer">
         <div class="divider"></div>
-        <div>NTFL schedule note: numbers in parentheses are scores. Example: <strong>vs Chargers (62-112)</strong> means the team scored 62 and lost 112-62.</div>
+        <div class="row" style="justify-content:space-between;align-items:center">
+          <div>NTFL schedule note: numbers in parentheses are scores. Example: <strong>vs Chargers (62-112)</strong> means the team scored 62 and lost 112-62.</div>
+          <div class="pill">Build ${APP_VERSION}</div>
+        </div>
       </div>
     </div>
   `;
