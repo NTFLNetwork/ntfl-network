@@ -1,7 +1,7 @@
 
 const STORAGE_KEY = "ntfl-site-draft";
 const AUTH_KEY = "ntfl-admin-auth";
-const DATA_URL = "data/site-data.json?v=" + Date.now();
+const DATA_URL = "data/site-data.json";
 const DEMO_USER = "demo";
 const DEMO_PASS = "demo123";
 
@@ -284,7 +284,7 @@ function normalizeData(input) {
     season: "Season 3",
     currentWeek: 1,
     subtitle: "Modern editable league hub",
-    version: "paragon-modern-fix-2",
+    version: "modern-fix-3",
     lastUpdated: new Date().toISOString().slice(0, 10)
   }, data.site || {});
   data.divisions = Array.isArray(data.divisions) ? data.divisions : [];
@@ -320,15 +320,108 @@ async function loadData() {
 }
 
 function saveToBrowser() {
+  syncAdminDraft();
+}
+
+function readSiteEditor() {
+  const card = document.getElementById("site-editor");
+  if (!card) return;
+  const inputs = card.querySelectorAll("input");
+  const map = Object.fromEntries([...inputs].map(i => [i.name, i.value]));
+  state.data.site.name = map.siteName || state.data.site.name;
+  state.data.site.season = map.siteSeason || state.data.site.season;
+  state.data.site.currentWeek = Number(map.siteWeek || state.data.site.currentWeek || 1);
+  state.data.site.subtitle = map.siteSubtitle || state.data.site.subtitle;
+}
+
+function readGamesEditor() {
+  const card = document.getElementById("games-editor");
+  if (!card) return;
+  const rows = card.querySelectorAll(".game-edit");
+  rows.forEach(row => {
+    const id = row.dataset.gameId;
+    const game = state.data.games.find(g => g.id === id);
+    if (!game) return;
+    const get = field => row.querySelector(`[data-field="${field}"]`)?.value ?? "";
+    const hs = get("homeScore");
+    const as = get("awayScore");
+    game.homeScore = hs === "" ? null : Number(hs);
+    game.awayScore = as === "" ? null : Number(as);
+    game.status = get("status") || "upcoming";
+    game.time = get("time");
+    game.played = game.status === "final";
+  });
+}
+
+function readTeamEditor() {
+  const card = document.getElementById("team-editor");
+  if (!card) return;
+  const slug = state.ui.adminTeam;
+  const team = teamBySlug(slug);
+  if (!team) return;
+  team.headCoach = card.querySelector('[name="headCoach"]')?.value || "TBD";
+  team.assistantCoach = card.querySelector('[name="assistantCoach"]')?.value || "TBD";
+  team.notes = card.querySelector('[name="notes"]')?.value || "";
+}
+
+function readAwardsEditor() {
+  const rows = document.querySelectorAll("#awards-editor [data-award-row]");
+  state.data.awards = [...rows].map(row => ({
+    category: row.querySelector('[data-field="category"]')?.value || "",
+    winner: row.querySelector('[data-field="winner"]')?.value || "",
+    team: row.querySelector('[data-field="team"]')?.value || ""
+  }));
+}
+
+function readHistoryEditor() {
+  const rows = document.querySelectorAll("#history-editor [data-history-row]");
+  state.data.history = [...rows].map(row => ({
+    season: row.querySelector('[data-field="season"]')?.value || "",
+    champion: row.querySelector('[data-field="champion"]')?.value || "",
+    record: row.querySelector('[data-field="record"]')?.value || "",
+    notes: row.querySelector('[data-field="notes"]')?.value || ""
+  }));
+}
+
+function readHOFEditor() {
+  const rows = document.querySelectorAll("#hof-editor [data-hof-row]");
+  state.data.hallOfFame = [...rows].map(row => ({
+    name: row.querySelector('[data-field="name"]')?.value || "",
+    team: row.querySelector('[data-field="team"]')?.value || "",
+    honor: row.querySelector('[data-field="honor"]')?.value || "",
+    notes: row.querySelector('[data-field="notes"]')?.value || ""
+  }));
+}
+
+function syncAdminDraft() {
+  readSiteEditor();
+  readGamesEditor();
+  readTeamEditor();
+  readAwardsEditor();
+  readHistoryEditor();
+  readHOFEditor();
+  state.data.site.lastUpdated = new Date().toISOString().slice(0, 10);
+  rebuildDerived(state.data);
   saveDraft(state.data);
 }
 
+function bindAdminAutosave() {
+  if (!isAuthed() || state.route.page !== "admin") return;
+  const root = document.querySelector(".admin-grid");
+  if (!root || root.dataset.autosyncBound === "1") return;
+  root.dataset.autosyncBound = "1";
+  const handler = () => syncAdminDraft();
+  root.addEventListener("input", handler);
+  root.addEventListener("change", handler);
+}
+
 function downloadJSON() {
+  syncAdminDraft();
   const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const a = document.createElement("a");
   a.href = url;
-  a.download = "data.json";
+  a.download = "site-data.json";
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -853,7 +946,7 @@ function adminPage() {
         <p>Update games, scores, live status, rankings, awards, history, and team rundowns.</p>
       </div>
       <div class="page-tools">
-        <button class="btn" onclick="NTFL.download()">Download data.json</button>
+        <button class="btn" onclick="NTFL.download()">Download site-data.json</button>
         <button class="btn" onclick="NTFL.saveBrowser()">Save Draft</button>
         <button class="btn danger" onclick="NTFL.logout()">Logout</button>
       </div>
@@ -1105,6 +1198,7 @@ function render() {
       ${footerHTML()}
     </div>
   `;
+  bindAdminAutosave();
 }
 
 function persistAndRender() {
@@ -1241,14 +1335,15 @@ function logout() {
   render();
 }
 function saveBrowser() {
-  saveDraft(state.data);
+  syncAdminDraft();
   alert("Draft saved in this browser.");
 }
 function download() {
+  syncAdminDraft();
   const blob = new Blob([JSON.stringify(state.data, null, 2)], { type: "application/json" });
   const link = document.createElement("a");
   link.href = URL.createObjectURL(blob);
-  link.download = "data.json";
+  link.download = "site-data.json";
   document.body.appendChild(link);
   link.click();
   link.remove();
