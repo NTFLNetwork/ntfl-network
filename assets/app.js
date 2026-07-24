@@ -92,8 +92,13 @@ function sortStandings(rows){
 
 function parseGameStatus(game){
   if(game.status) return game.status;
-  if(Number.isFinite(game.homeScore) && Number.isFinite(game.awayScore)) return 'final';
-  return 'scheduled';
+  if (
+  game.homeScore === null ||
+  game.awayScore === null ||
+  game.homeScore === undefined ||
+  game.awayScore === undefined
+) {
+  return "Scheduled";
 }
 
 function computeDerived(data){
