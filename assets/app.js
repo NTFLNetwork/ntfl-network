@@ -90,15 +90,19 @@ function sortStandings(rows){
   return [...rows].sort((a,b)=> b.wins - a.wins || b.pointDiff - a.pointDiff || b.pointsFor - a.pointsFor || a.name.localeCompare(b.name));
 }
 
-function parseGameStatus(game){
-  if(game.status) return game.status;
+  function parseGameStatus(game){
+  if (game.status) return game.status;
+
   if (
-  game.homeScore === null ||
-  game.awayScore === null ||
-  game.homeScore === undefined ||
-  game.awayScore === undefined
-) {
-  return "Scheduled";
+    game.homeScore === null ||
+    game.awayScore === null ||
+    game.homeScore === undefined ||
+    game.awayScore === undefined
+  ) {
+    return "Scheduled";
+  }
+
+  return "Final";
 }
 
 function computeDerived(data){
