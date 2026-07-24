@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 120">
-  <rect width="320" height="120" rx="24" fill="#08111f"/>
-  <circle cx="60" cy="60" r="34" fill="#1d4ed8"/>
-  <text x="60" y="72" text-anchor="middle" font-family="Arial, sans-serif" font-size="28" font-weight="700" fill="#ffffff">NT</text>
-  <text x="120" y="52" font-family="Arial, sans-serif" font-size="22" font-weight="700" fill="#ffffff">NTFL</text>
-  <text x="120" y="80" font-family="Arial, sans-serif" font-size="12" fill="#cbd5e1">Modern League Hub</text>
-</svg>
