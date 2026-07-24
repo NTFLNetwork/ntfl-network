@@ -1,0 +1,290 @@
+[
+  {
+    "team": "Chiefs",
+    "coach": "@always_chiefs",
+    "ac": "@DelanesDomain5",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC West",
+    "conference": "AFC"
+  },
+  {
+    "team": "Broncos",
+    "coach": "@PickedByPS2",
+    "ac": "@SurtainGlazer",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC West",
+    "conference": "AFC"
+  },
+  {
+    "team": "Raiders",
+    "coach": "@SatansWrathful",
+    "ac": "@RAIDERNTFL",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC West",
+    "conference": "AFC"
+  },
+  {
+    "team": "Chargers",
+    "coach": "@OmarionHamp2",
+    "ac": "@PettyPDinero",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC West",
+    "conference": "AFC"
+  },
+  {
+    "team": "Bengals",
+    "coach": "@Dude_Man_11",
+    "ac": "@RDukes08",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC North",
+    "conference": "AFC"
+  },
+  {
+    "team": "Ravens",
+    "coach": "@H0LLYW00DCARLOS",
+    "ac": "@HoodieYo8",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC North",
+    "conference": "AFC"
+  },
+  {
+    "team": "Steelers",
+    "coach": "@Feed_DK",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC North",
+    "conference": "AFC"
+  },
+  {
+    "team": "Browns",
+    "coach": "@martinsport2495",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC North",
+    "conference": "AFC"
+  },
+  {
+    "team": "Titans",
+    "coach": "@InformedWatcher",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC South",
+    "conference": "AFC"
+  },
+  {
+    "team": "Texans",
+    "coach": "@CamIsKing11",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC South",
+    "conference": "AFC"
+  },
+  {
+    "team": "Jaguars",
+    "coach": "@liamcoenszn",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC South",
+    "conference": "AFC"
+  },
+  {
+    "team": "Colts",
+    "coach": "@happystlfan4",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC South",
+    "conference": "AFC"
+  },
+  {
+    "team": "Bills",
+    "coach": "@iancmcclintock",
+    "ac": "@Valen59DaGoat",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC East",
+    "conference": "AFC"
+  },
+  {
+    "team": "Dolphins",
+    "coach": "@WydPoison",
+    "ac": "@QuixProductions",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC East",
+    "conference": "AFC"
+  },
+  {
+    "team": "Jets",
+    "coach": "@Scotclone",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC East",
+    "conference": "AFC"
+  },
+  {
+    "team": "Patriots",
+    "coach": "@M_JWYouTube",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "AFC East",
+    "conference": "AFC"
+  },
+  {
+    "team": "Bears",
+    "coach": "@burdenszn",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC North",
+    "conference": "NFC"
+  },
+  {
+    "team": "Lions",
+    "coach": "@MossedBySunGod",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC North",
+    "conference": "NFC"
+  },
+  {
+    "team": "Packers",
+    "coach": "@bug49_",
+    "ac": "@NotOnGodOnRodge",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC North",
+    "conference": "NFC"
+  },
+  {
+    "team": "Vikings",
+    "coach": "@GarganoSzn1",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC North",
+    "conference": "NFC"
+  },
+  {
+    "team": "Cowboys",
+    "coach": "@ClaytonSkiles",
+    "ac": "*NotLikeCeedee",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC East",
+    "conference": "NFC"
+  },
+  {
+    "team": "Eagles",
+    "coach": "@BraedonMinarik",
+    "ac": "@Philliesszn2026",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC East",
+    "conference": "NFC"
+  },
+  {
+    "team": "Commanders",
+    "coach": "@Xommanders",
+    "ac": "@NateBG_22",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC East",
+    "conference": "NFC"
+  },
+  {
+    "team": "Giants",
+    "coach": "@wydpoint",
+    "ac": "@Laf4MVP_",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC East",
+    "conference": "NFC"
+  },
+  {
+    "team": "Saints",
+    "coach": "@ThomasBart17127",
+    "ac": "@ihykronos",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC South",
+    "conference": "NFC"
+  },
+  {
+    "team": "Panthers",
+    "coach": "@gabriel_ki4939",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC South",
+    "conference": "NFC"
+  },
+  {
+    "team": "Falcons",
+    "coach": "@grae_visocan",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC South",
+    "conference": "NFC"
+  },
+  {
+    "team": "Buccaneers",
+    "coach": "@bucsnationx210",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC South",
+    "conference": "NFC"
+  },
+  {
+    "team": "Rams",
+    "coach": "@Bucsfan6to13",
+    "ac": "@ChickenNinja42",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC West",
+    "conference": "NFC"
+  },
+  {
+    "team": "49ers",
+    "coach": "@Ty_C13",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC West",
+    "conference": "NFC"
+  },
+  {
+    "team": "Seahawks",
+    "coach": "@wardangsports88",
+    "ac": "@gregheffley2011",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC West",
+    "conference": "NFC"
+  },
+  {
+    "team": "Cardinals",
+    "coach": "@watts__53",
+    "ac": "",
+    "testing": "\u2705",
+    "jersey_in_w1": "\u2705",
+    "division": "NFC West",
+    "conference": "NFC"
+  }
+]
